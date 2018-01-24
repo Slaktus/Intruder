@@ -1,0 +1,29 @@
+ # Project
+Assets/StreamingAssets/
+Assets/Textures
+Assets/Video
+Assets/Audio
+Library/
+Temp/
+obj/
+.vs/
+
+# Files generated externally
+*(Conflicted)*
+*.booproj
+*.csproj
+*.pidb
+*.sln
+*.suo
+*.user
+*.userprefs
+*.unityproj
+*.dll
+*.vs
+*.asset
+*.manifest
+*.meta
+*.lock
+*.ide
+*.ide-wal
+*.ide-shm
