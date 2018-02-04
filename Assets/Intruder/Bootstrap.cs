@@ -10,7 +10,7 @@ public class Bootstrap : MonoBehaviour
 	// Use this for initialization
 	void Awake ()
     {
-        grid = new Grid( 8 , 4 , 1.25f );
+        grid = new Grid( 8 , 4 , 1.35f );
 
         /*home = new Home( Vector3.zero );
         plusA = new Plus( Vector3.right * 3 );

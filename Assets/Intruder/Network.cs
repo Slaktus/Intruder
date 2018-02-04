@@ -56,8 +56,6 @@ namespace Intruder
             gameObject.transform.rotation = Quaternion.Euler( 0 , rotation , 0 );
             this.rotation = rotation;
 
-            Debug.Log( connections.Count );
-
             for ( int i = 0 ; connections.Count > i ; i++ )
                 connections[ i ].UpdatePositions();
 
