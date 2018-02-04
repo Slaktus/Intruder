@@ -26,7 +26,7 @@ namespace Intruder
         private float _time { get; set; }
         private float _interval { get; set; }
 
-        public Home ( Network network , GameObject parent , int resolution = 50 ) : base ( network , parent , resolution )
+        public Home ( Grid grid , Network network , GameObject parent , int resolution = 50 ) : base ( grid , network , parent , resolution )
         {
             _interval = 1;
         }

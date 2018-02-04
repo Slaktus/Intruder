@@ -11,6 +11,6 @@ namespace Intruder
             return signal.Minus();
         }
 
-        public Minus( Network network , GameObject gameObject , int resolution = 50 ) : base( network , gameObject , resolution ) { }
+        public Minus( Grid grid , Network network , GameObject gameObject , int resolution = 50 ) : base( grid , network , gameObject , resolution ) { }
     }
 }

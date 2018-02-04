@@ -33,7 +33,7 @@ namespace Intruder
             if ( grid.ValidRadius( this , _radius + distance ) )
             {
                 _radius += distance;
-                _radius = Mathf.Clamp( _radius , _nodeEditors.Count > 1 ? 0.85f : 0.5f , _nodeEditors.Count > 1 ? 2 : 0.5f );
+                _radius = Mathf.Clamp( _radius , _nodeEditors.Count > 1 ? 1 : 0.5f , _nodeEditors.Count > 0 ? 1f : 0.5f );
 
                 _radiusHandle.transform.position = network.gameObject.transform.position + ( Vector3.right * _radius ) + ( Vector3.up * network.gameObject.transform.localScale.y );
                 _rotationHandle.transform.position = network.gameObject.transform.position + ( Vector3.left * _radius ) + ( Vector3.up * network.gameObject.transform.localScale.y );
@@ -48,15 +48,15 @@ namespace Intruder
         public NetworkEditor AddNodeEditor()
         {
             if ( 9 > _nodeEditors.Count && ( _nodeEditors.Count == 0 || grid.ValidRadius( this , _radius ) ) )
-                _nodeEditors.Add( new NodeEditor( network , _gameObject ) );
+                _nodeEditors.Add( new NodeEditor( grid , network , _gameObject ) );
 
             if ( _nodeEditors.Count == 9 )
                 _addNodeButton.SetActive( false );
 
-            if ( _nodeEditors.Count > 1 && !_radiusHandle.activeSelf )
+            if ( _nodeEditors.Count > 0 && !_radiusHandle.activeSelf )
                 _radiusHandle.SetActive( true );
 
-            if ( _nodeEditors.Count > 1 && !_rotationHandle.activeSelf )
+            if ( _nodeEditors.Count > 0 && !_rotationHandle.activeSelf )
                 _rotationHandle.SetActive( true );
 
             if ( !_removeNodeButton.activeSelf )
@@ -73,10 +73,10 @@ namespace Intruder
             if ( index >= 0 )
                 _nodeEditors.Remove( _nodeEditors[ index ].Remove() );
 
-            if ( _nodeEditors.Count == 1 && _radiusHandle.activeSelf )
+            if ( _nodeEditors.Count == 0 && _radiusHandle.activeSelf )
                 _radiusHandle.SetActive( false );
 
-            if ( _nodeEditors.Count == 1 && _rotationHandle.activeSelf )
+            if ( _nodeEditors.Count == 0 && _rotationHandle.activeSelf )
                 _rotationHandle.SetActive( false );
 
             if ( 9 > _nodeEditors.Count && !_addNodeButton.activeSelf )
@@ -206,6 +206,7 @@ namespace Intruder
                     if ( network == null )
                     {
                         AddNetwork();
+                        AddNodeEditor( button );
                         _removeNodeButton.SetActive( true );
                     }
                     else
@@ -221,13 +222,14 @@ namespace Intruder
             _removeNodeButton.AddComponent<QuickButton>().SetMouseDown(
                 ( QuickButton button ) =>
                 {
+                    RemoveNodeEditor( button );
+
                     if ( _nodeEditors.Count == 0 )
                     {
                         RemoveNetwork();
                         _removeNodeButton.SetActive( false );
                     }
-                    else
-                        RemoveNodeEditor( button );
+
                 } );
             _removeNodeButton.transform.localScale = Vector3.one * 0.2f;
             _removeNodeButton.transform.SetParent( _gameObject.transform );

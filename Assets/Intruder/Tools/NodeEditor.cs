@@ -101,19 +101,19 @@ namespace Intruder
         private Node AddHome()
         {
             _current = Nodes.Home;
-            return node = new Home( _network , _gameObject );
+            return node = new Home( _grid , _network , _gameObject );
         }
 
         private Node AddPlus()
         {
             _current = Nodes.Plus;
-            return node = new Plus( _network , _gameObject );
+            return node = new Plus( _grid , _network , _gameObject );
         }
 
         private Node AddMinus()
         {
             _current = Nodes.Minus;
-            return node = new Minus( _network , _gameObject );
+            return node = new Minus( _grid , _network , _gameObject );
         }
 
         public Node node { get; private set; }
@@ -125,9 +125,11 @@ namespace Intruder
         private GameObject _nextNode { get; set; }
         private Network _network { get; set; }
         private Nodes _current { get; set; }
+        private Grid _grid { get; set; }
 
-        public NodeEditor( Network network , GameObject parent )
+        public NodeEditor( Grid grid , Network network , GameObject parent )
         {
+            _grid = grid;
             _network = network;
 
             _gameObject = GameObject.CreatePrimitive( PrimitiveType.Cube );

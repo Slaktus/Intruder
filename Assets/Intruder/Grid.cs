@@ -16,7 +16,7 @@ namespace Intruder
                     {
                         if ( instances[ i ].network != null && i != j )
                         {
-                            float distance = Vector3.Distance( positions[ i ] , positions[ j ] ) - 0.5f;
+                            float distance = Vector3.Distance( positions[ i ] , positions[ j ] ) - ( spacing * 0.5f );
 
                             if ( instances[ j ] != null && instances[ i ].network.radius > distance )
                             {
@@ -38,7 +38,7 @@ namespace Intruder
                     {
                         if ( i != j )
                         {
-                            float distance = Vector3.Distance( positions[ i ] , positions[ j ] ) - 0.5f;
+                            float distance = Vector3.Distance( positions[ i ] , positions[ j ] ) - ( spacing * 0.5f );
 
                             if ( instances[ j ] != null && instances[ j ].network != null && instances[ j ].network.radius > distance )
                                 occupied = true;
@@ -72,20 +72,43 @@ namespace Intruder
             for ( int i = 0 ; positions.Length > i ; i++ )
                 if ( i != index )
                 {
-                    float distance = Vector3.Distance( positions[ index ] , positions[ i ] ) - 0.25f;
+                    float distance = Vector3.Distance( positions[ index ] , positions[ i ] ) - 0.5f;
 
-                    if ( instances[ i ] != null && instances[ i ].network != null && radius + instances[ i ].network.radius > distance )
+                    if ( instances[ i ] != null && instances[ i ].network != null && radius + instances[ i ].network.radius >= distance )
                         return false;
                 }
 
             return true;
         }
 
-        int width;
-        int height;
-        float spacing;
-        Vector3[] positions;
-        NetworkEditor[] instances;
+        public Node GetNode ( GameObject gameObject )
+        {
+            Node node = null;
+
+            for ( int i = 0 ; instances.Length > i && node == null ; i++ )
+                if ( instances[ i ] != null && instances[ i ].network != null )
+                    node = instances[ i ].network.GetNode( gameObject );
+
+            return node;
+        }
+
+
+        public Network GetNetwork( Node node )
+        {
+            Network network = null;
+
+            for ( int i = 0 ; instances.Length > i && network == null ; i++ )
+                if ( instances[ i ] != null && instances[ i ].network != null )
+                    network = instances[ i ].network.HasNode( node ) ? instances[ i ].network : null;
+
+            return network;
+        }
+
+        int width { get; set; }
+        int height { get; set; }
+        float spacing { get; set; }
+        Vector3[] positions { get; set; }
+        NetworkEditor[] instances { get; set; }
 
         public Grid ( int width , int height , float spacing )
         {

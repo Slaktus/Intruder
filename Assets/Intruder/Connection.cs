@@ -73,7 +73,8 @@ namespace Intruder
 
             _a.RemoveConnection( this );
             _b.RemoveConnection( this );
-            _network.Remove( this );
+            _networkA.Remove( this );
+            _networkB.Remove( this );
             _body = null;
             _a = null;
             _b = null;
@@ -141,14 +142,17 @@ namespace Intruder
         private Node _b { get; set; }
         private Link _link { get; set; }
         private Link _connection { get; set; }
-        private Network _network { get; set; }
         private GameObject _body { get; set; }
+        private Network _networkA { get; set; }
+        private Network _networkB { get; set; }
         private Queue<Signal> _signalQueue { get; set; }
 
-        public Connection( Network network , Node a , Node b )
+        public Connection( Network networkA , Network networkB , Node a , Node b )
         {
-            _network = network;
-            network.Add( this );
+            _networkA = networkA;
+            networkA.Add( this );
+            _networkB = networkB;
+            networkB.Add( this );
             _body = new GameObject( "Connection" );
             Vector3 direction = ( b.position - a.position ).normalized;
             float distance = Vector3.Distance( a.position , b.position );

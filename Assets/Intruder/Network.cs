@@ -73,6 +73,11 @@ namespace Intruder
             return null;
         }
 
+        public bool HasNode ( Node node )
+        {
+            return nodes.Contains( node );
+        }
+
         public float radius { get; private set; }
         public float rotation { get; private set; }
         public List<Node> nodes { get; private set; }

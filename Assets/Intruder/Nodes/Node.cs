@@ -109,7 +109,8 @@ namespace Intruder
                         //Then add Grid and a second Network instance to Connection, and we should be all good to go
                         //woooooo
 
-                        end = end != this ? network.GetNode( hits[ i ].transform.gameObject ) : null;
+                        end = end != this ? grid.GetNode( hits[ i ].transform.gameObject ) : null;
+                        Network endNetwork = grid.GetNetwork( end );
 
                         if ( end != null )
                         {
@@ -120,7 +121,7 @@ namespace Intruder
                                     connected = true;
 
                             if ( !connected )
-                                new Connection( network , start , end ).ShowConnection( button );
+                                new Connection( network , endNetwork , start , end ).ShowConnection( button );
                         }
                     }
                 }
@@ -136,13 +137,15 @@ namespace Intruder
 
         protected Network network { get; private set; }
 
+        private Grid grid { get; set; }
         private int _index { get; set; }
         private Marker _marker { get; set; }
         private GameObject _body { get; set; }
         private GameObject _cylinder { get; set; }
 
-        public Node( Network network , GameObject parent , int resolution = 50 )
+        public Node( Grid grid , Network network , GameObject parent , int resolution = 50 )
         {
+            this.grid = grid;
             this.network = network;
 
             _index = -1;
