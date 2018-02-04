@@ -5,11 +5,12 @@ using Intruder;
 
 public class Bootstrap : MonoBehaviour
 {
+    Grid grid;
+
 	// Use this for initialization
-	void Start ()
+	void Awake ()
     {
-        networkBase = new NetworkEditor();
-        networkBase.AddNetwork();
+        grid = new Grid( 9 , 5 , 1 );
 
         /*home = new Home( Vector3.zero );
         plusA = new Plus( Vector3.right * 3 );
@@ -31,18 +32,7 @@ public class Bootstrap : MonoBehaviour
 
     private void Update()
     {
-        networkBase.Update();
-
-        if ( Input.GetKeyDown( KeyCode.Space ) )
-            networkBase.AddNodeEditor();
-
-        if ( Input.GetKeyDown( KeyCode.KeypadPlus ) )
-            networkBase.ModifyRadius( 0.1f );
-
-        if ( Input.GetKeyDown( KeyCode.KeypadMinus ) )
-            networkBase.ModifyRadius( -0.1f );
-
-        //home.Signal( this );
+        grid.Update();
     }
 
     NetworkEditor networkBase { get; set; }

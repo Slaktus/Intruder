@@ -105,6 +105,10 @@ namespace Intruder
 
                     for ( int i = 0 ; hits.Length > i && end == null ; i++ )
                     {
+                        //TODO: Add Grid to Node and go through all the NetworkBase instances and get the nodes from there instead
+                        //Then add Grid and a second Network instance to Connection, and we should be all good to go
+                        //woooooo
+
                         end = end != this ? network.GetNode( hits[ i ].transform.gameObject ) : null;
 
                         if ( end != null )
@@ -147,10 +151,10 @@ namespace Intruder
             _cylinder = GameObject.CreatePrimitive( PrimitiveType.Cylinder );
             _cylinder.AddComponent<QuickButton>().SetMouseDown( ( QuickButton button ) => ConnectNodes( button , this ) );
             _cylinder.transform.SetParent( _body.transform );
+            _cylinder.transform.localPosition = Vector3.zero;
 
-            if ( parent != null )
-                _body.transform.SetParent( parent.transform );
-
+            _body.transform.SetParent( parent.transform );
+            _body.transform.localPosition = Vector3.zero;
             _body.transform.localScale = Vector3.one;
             _marker = new Marker( resolution , _body );
             connections = new List<Connection>();

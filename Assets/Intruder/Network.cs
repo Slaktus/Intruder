@@ -39,6 +39,8 @@ namespace Intruder
                 Remove( nodes[ nodes.Count - 1 ] );
             }
 
+            GameObject.Destroy( cylinder );
+            GameObject.Destroy( gameObject );
             return this;
         }
 
@@ -86,6 +88,8 @@ namespace Intruder
             gameObject.transform.SetParent( parent.transform );
             cylinder = GameObject.CreatePrimitive( PrimitiveType.Cylinder );
             cylinder.transform.SetParent( gameObject.transform );
+            gameObject.transform.localPosition = Vector3.zero;
+            SetRadius( 0.5f );
         }
     }
 }
