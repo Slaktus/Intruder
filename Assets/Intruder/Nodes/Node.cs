@@ -92,10 +92,21 @@ namespace Intruder
         private IEnumerator ConnectNodesHandler( QuickButton button , Node start )
         {
             bool holding = true;
+            LineRenderer lineRenderer = new GameObject( "LineRenderer" ).AddComponent<LineRenderer>();
+            Vector3 offset = Vector3.up * 0.1f;
+            lineRenderer.transform.position = position + offset;
+            lineRenderer.numCapVertices = 3;
+            lineRenderer.startWidth = 0.125f;
+            lineRenderer.endWidth = 0.125f;
+            lineRenderer.positionCount = 2;
+            lineRenderer.SetPosition( 0 , position + offset );
+            lineRenderer.SetPosition( 1 , position + offset );
 
             while ( holding )
             {
                 holding = Input.GetMouseButton( 0 );
+                Vector2 mousePosition = Input.mousePosition;
+                lineRenderer.SetPosition( 1 , Camera.main.ScreenToWorldPoint( new Vector3( mousePosition.x , mousePosition.y , Camera.main.transform.position.y - 1 ) ) + ( offset ) );
 
                 if ( !holding )
                 {
@@ -121,13 +132,18 @@ namespace Intruder
                                     connected = true;
 
                             if ( !connected )
-                                new Connection( network , endNetwork , start , end ).ShowConnection( button );
+                            {
+                                Connection connection = new Connection( network , endNetwork , start , end ).ShowConnection( button , true );
+                                network.Add( connection );
+                            }
                         }
                     }
                 }
 
                 yield return null;
             }
+
+            GameObject.Destroy( lineRenderer.gameObject );
         }
 
         public bool IsNode ( GameObject gameObject )

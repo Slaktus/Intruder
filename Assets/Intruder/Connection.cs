@@ -22,18 +22,27 @@ namespace Intruder
         public Connection HideLink( MonoBehaviour client )
         {
             _link.Operate( client , Vector3.up * 0.1f , master , master == _a ? _b : _a , Link.Operation.Hide );
+
             return this;
         }
 
-        public Connection ShowConnection( MonoBehaviour client )
+        public Connection ShowConnection( MonoBehaviour client , bool immediately = false )
         {
             _connection.Operate( client , Vector3.up * 0.1f , master , master == _a ? _b : _a , Link.Operation.Show );
+
+            if ( immediately )
+                _connection.SetLerpTime( 1 );
+
             return this;
         }
 
-        public Connection HideConnection( MonoBehaviour client )
+        public Connection HideConnection( MonoBehaviour client , bool immediately = false )
         {
             _connection.Operate( client , Vector3.up * 0.1f , master , master == _a ? _b : _a , Link.Operation.Hide );
+
+            if ( immediately )
+                _connection.SetLerpTime( 1 );
+
             return this;
         }
 

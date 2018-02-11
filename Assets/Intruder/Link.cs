@@ -137,7 +137,7 @@ namespace Intruder
         public enum Operation
         {
             Show,
-            Hide
+            Hide,
         }
     }
 }
