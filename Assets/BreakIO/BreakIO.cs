@@ -115,9 +115,13 @@ namespace BreakIO
         public void EditorUpdate()
         {
             UpdateMousePosition();
+            TrySwapTerminal();
+            TryAddTerminal();
             TryAddConnection();
-            TryAddNode();
             TryRemoveNode();
+            TryRemoveTerminal();
+            TryRemoveConnection();
+            TryAddNode();
             TryRemoveNetwork();
             TryAddNetwork();
             EditorDraw();
@@ -138,7 +142,7 @@ namespace BreakIO
                 Draw.Circle( networks[ i ].position , networks[ i ].radius , networks[ i ].Contains( currentValidMousePosition ) ? Color.red : Color.yellow );
 
             for ( int i = 0 ; nodes.Count > i ; i++ )
-                Draw.Circle( nodes[ i ].position , nodes[ i ].radius , nodes[ i ].Contains( currentValidMousePosition ) ? Color.red : Color.yellow );
+                Draw.Circle( nodes[ i ].position , nodes[ i ].radius , nodes[ i ].Contains( currentValidMousePosition ) ? Color.red : nodes[ i ].terminal != null ? Color.green : Color.yellow );
 
             for ( int i = 0 ; connections.Count > i ; i++ )
                 Draw.LineFromTo( connections[ i ].a.position , connections[ i ].b.position , Color.yellow );
@@ -178,8 +182,8 @@ namespace BreakIO
 
         private void TryRemoveNode()
         {
-            if ( Input.GetMouseButtonDown( 1 ) && hoverNetwork != null && hoverNode == null )
-                hoverNetwork.RemoveNode();
+            if ( Input.GetMouseButtonDown( 1 ) && hoverNode != null && hoverNode.terminal == null )
+                hoverNetwork.RemoveNode( hoverNode );
         }
 
         private void TryAddNetwork()
@@ -213,7 +217,7 @@ namespace BreakIO
 
         public Node AddNode ( Network network , int index )
         {
-            Node node = new Node( network , index );
+            Node node = new Node( network );
             nodes.Add( node );
             return node;
         }
@@ -224,10 +228,39 @@ namespace BreakIO
             return node;
         }
 
+        public void TryAddTerminal()
+        {
+            if ( Input.GetMouseButtonDown( 0 ) && hoverNode != null && hoverNode.terminal == null )
+                hoverNode.AddTerminal();
+        }
+
+        public void TrySwapTerminal()
+        {
+            if ( !addingConnection && Input.GetMouseButtonDown( 0 ) && hoverNode != null && hoverNode.terminal != null )
+                hoverNode.terminal.SetMode( hoverNode.terminal.mode + 1 > Terminal.Mode.Count - 1 ? Terminal.Mode.Home : hoverNode.terminal.mode + 1 );
+        }
+
+        public void TryRemoveTerminal()
+        {
+            if ( !removingConnection && Input.GetMouseButtonDown( 1 ) && hoverNode != null && hoverNode.terminal != null )
+            {
+                hoverNode.RemoveTerminal();
+
+                while ( hoverNode.connections.Count > 0 )
+                    RemoveConnection( hoverNode.connections[ hoverNode.connections.Count - 1 ] );
+            }
+        }
+
         public void TryAddConnection()
         {
-            if ( Input.GetMouseButtonDown( 0 ) && nearestNode != null && nearestNode.Contains( currentWorldMousePosition ) )
-                client.StartCoroutine( AddConnectionHandler( nearestNode ) );
+            if ( Input.GetMouseButtonDown( 0 ) && hoverNode != null && hoverNode.terminal != null )
+                client.StartCoroutine( AddConnectionHandler( hoverNode ) );
+        }
+
+        public void TryRemoveConnection()
+        {
+            if ( Input.GetMouseButtonDown( 1 ) && hoverNode == null )
+                client.StartCoroutine( RemoveConnectionHandler() );
         }
 
         public Connection AddConnection( Node a , Node b , Node master )
@@ -245,9 +278,34 @@ namespace BreakIO
             return connection;
         }
 
+        public Link AddLink ( Link link )
+        {
+            links.Add( link );
+            return link;
+        }
+
+        public Link RemoveLink( Link link )
+        {
+            links.Remove( link );
+            return link;
+        }
+
+        public Terminal AddTerminal ( Terminal terminal )
+        {
+            terminals.Add( terminal );
+            return terminal;
+        }
+
+        public Terminal RemoveTerminal ( Terminal terminal )
+        {
+            terminals.Remove( terminal );
+            return terminal;
+        }
+
         private IEnumerator AddConnectionHandler( Node a )
         {
             Node b = null;
+            addingConnection = true;
 
             while ( Input.GetMouseButton( 0 ) )
             {
@@ -258,10 +316,67 @@ namespace BreakIO
 
             if ( b != a && b != null && !HasConnection( a , b ) )
             {
+                if ( b.terminal == null )
+                    b.AddTerminal();
+
                 Connection connection = AddConnection( a , b , a );
                 b.AddConnection( connection );
                 a.AddConnection( connection );
             }
+
+            addingConnection = false;
+        }
+
+        private IEnumerator RemoveConnectionHandler()
+        {
+            removingConnection = true;
+            Vector3 start = currentWorldMousePosition;
+
+            while ( Input.GetMouseButton( 1 ) )
+            {
+                Draw.LineFromTo( start , currentWorldMousePosition , Color.red );
+                yield return null;
+            }
+
+            Vector3 end = currentWorldMousePosition;
+            int index = -1;
+
+            for ( int i = 0 ; connections.Count > i && 0 > index ; i++ )
+                if ( IntersectionPoint( start , end , connections[ i ].a.position , connections[ i ].b.position ) != Vector2.zero )
+                    index = i;
+
+            if ( index >= 0 )
+                connections[ index ].Destroy();
+
+            removingConnection = false;
+        }
+
+        public static Vector2 IntersectionPoint( Vector2 a1 , Vector2 a2 , Vector2 b1 , Vector2 b2 )
+        {
+            float d =
+                ( b2.y - b1.y ) * ( a2.x - a1.x )
+                -
+                ( b2.x - b1.x ) * ( a2.y - a1.y );
+
+            float a =
+                ( b2.x - b1.x ) * ( a1.y - b1.y )
+                -
+                ( b2.y - b1.y ) * ( a1.x - b1.x );
+
+            float b =
+                ( a2.x - a1.x ) * ( a1.y - b1.y )
+                -
+                ( a2.y - a1.y ) * ( a1.x - b1.x );
+
+            if ( d == 0 )
+                return Vector3.zero;
+
+            float ua = a / d;
+            float ub = b / d;
+
+            return ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1
+                ? new Vector2( a1.x + ( ua * ( a2.x - a1.x ) ) , a1.y + ( ua * ( a2.y - a1.y ) ) )
+                : Vector2.zero;
         }
 
         public bool HasConnection ( Node a , Node b )
@@ -308,7 +423,12 @@ namespace BreakIO
                 List<Node> nodes = new List<Node>( this.nodes.Count );
 
                 for ( int i = 0 ; networks.Count > i ; i++ )
-                    nodes.Add( networks[ i ].NearestNode( currentWorldMousePosition ) );
+                {
+                    Node nearest = networks[ i ].NearestNode( currentWorldMousePosition );
+
+                    if ( nearest != null )
+                        nodes.Add( nearest );
+                }
 
                 int index = -1;
                 float shortest = float.PositiveInfinity;
@@ -363,18 +483,25 @@ namespace BreakIO
 
         public Grid grid { get; private set; }
         public List<Node> nodes { get; private set; }
+        public List<Link> links { get; private set; }
         public List<Network> networks { get; private set; }
+        public List<Terminal> terminals { get; private set; }
         public List<Connection> connections { get; private set; }
 
+        
         private Mesh mesh { get; set; }
-        private MeshCollider meshCollider { get; set; }
         private MonoBehaviour client { get; set; }
+        private bool addingConnection { get; set; }
+        private bool removingConnection { get; set; }
+        private MeshCollider meshCollider { get; set; }
 
         public Level ( int width , int height , float spacing , MonoBehaviour client = null , float padding = -1 )
         {
             grid = new Grid( width , height , spacing );
             connections = new List<Connection>();
+            terminals = new List<Terminal>();
             networks = new List<Network>();
+            links = new List<Link>();
             nodes = new List<Node>();
 
             if ( 0 > padding )
@@ -433,8 +560,124 @@ namespace BreakIO
         }
     }
 
+    public class Link
+    {
+        public Link SetSlave ( Node slave )
+        {
+            this.slave = slave;
+            return this;
+        }
+
+        public Link SetMaster ( Node master )
+        {
+            this.master = master;
+            return this;
+        }
+
+        public Link Destroy()
+        {
+            connection.level.RemoveLink( this );
+            connection = null;
+            master = null;
+            slave = null;
+            return this;
+        }
+
+        public Node slave { get; private set; }
+        public Node master { get; private set; }
+        public Connection connection { get; private set; }
+
+        public Link ( Connection connection , Node master , Node slave )
+        {
+            this.connection = connection;
+            this.master = master;
+            this.slave = slave;
+
+        }
+    }
+
+    public class Terminal
+    {
+        public Terminal SetMode ( Mode mode )
+        {
+            this.mode = mode;
+            return this;
+        }
+
+        public Terminal AddLink ( Connection connection , Node master , Node slave )
+        {
+            links.Add( connection.level.AddLink( new Link( connection , master , slave ) ) );
+            return this;
+        }
+
+        public Terminal RemoveLink ( Connection connection )
+        {
+            int index = -1;
+
+            for ( int i = 0 ; links.Count > i && 0 > index ; i++ )
+                if ( links[ i ].connection == connection )
+                    index = i;
+
+            if ( index >= 0 )
+                links.Remove( links[ index ].Destroy() );
+
+            return this;
+        }
+
+        public Terminal RemoveLink( Link link )
+        {
+            links.Remove( link.Destroy() );
+            return this;
+        }
+
+        public Terminal Destroy()
+        {
+            while ( links.Count > 0 )
+                RemoveLink( links[ links.Count - 1 ] );
+
+            node.level.RemoveTerminal( this );
+            links = null;
+            node = null;
+            return this;
+        }
+
+        public List<Link> links { get; private set; }
+        public Node node { get; private set; }
+        public Mode mode { get; private set; }
+
+        public Terminal( Node node )
+        {
+            this.node = node;
+            links = new List<Link>( node.connections.Count );
+        }
+
+        public enum Mode
+        {
+            None,
+            Home,
+            Plus,
+            Minus,
+            Multiply,
+            Count
+        }
+    }
+
     public class Node
     {
+        public Terminal AddTerminal()
+        {
+            if ( terminal == null )
+                terminal = level.AddTerminal( new Terminal( this ) );
+
+            return terminal;
+        }
+
+        public void RemoveTerminal()
+        {
+            terminal.Destroy();
+            terminal = null;
+        }
+
         public Connection AddConnection ( Connection connection )
         {
             network.AddConnection( connection );
@@ -446,6 +689,10 @@ namespace BreakIO
         {
             connections.Remove( connection );
             network.RemoveConnection( connection );
+
+            if ( connections.Count == 0 && terminal != null )
+                RemoveTerminal();
+
             return connection;
         }
 
@@ -479,17 +726,17 @@ namespace BreakIO
             }
         }
 
+        public Network network { get; private set; }
+        public Terminal terminal { get; private set; }
         public float radius { get { return 0.0625f; } }
         public Level level { get { return network.level; } }
         public List<Connection> connections { get; private set; }
-        public Network network { get; private set; }
-        public int index { get; private set; }
+        public int index { get { return network.nodes.IndexOf( this ); } }
 
-        public Node ( Network network , int index )
+        public Node ( Network network )
         {
             connections = new List<Connection>();
             this.network = network;
-            this.index = index;
         }
     }
 
@@ -510,6 +757,12 @@ namespace BreakIO
         {
             if ( nodes.Count > 0 )
                 nodes.Remove( nodes[ nodes.Count - 1 ].Destroy() );
+        }
+
+        public void RemoveNode( Node node )
+        {
+            if ( nodes.Count > 0 )
+                nodes.Remove( node.Destroy() );
         }
 
         public Connection AddConnection ( Connection connection )
@@ -544,7 +797,7 @@ namespace BreakIO
                 }
             }
 
-            return nodes[ index ];
+            return index >= 0 ? nodes[ index ] : null;
         }
 
         public Network Destroy()
