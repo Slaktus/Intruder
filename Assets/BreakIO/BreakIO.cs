@@ -592,7 +592,6 @@ namespace BreakIO
             this.connection = connection;
             this.master = master;
             this.slave = slave;
-
         }
     }
 
@@ -860,6 +859,11 @@ namespace BreakIO
 
     public class Connection
     {
+        public Node Other ( Node node )
+        {
+            return node == a ? b : a;
+        }
+
         public bool Has ( Node node )
         {
             return node == a || node == b;
