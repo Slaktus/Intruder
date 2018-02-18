@@ -33,11 +33,6 @@ namespace BreakIO
         {
             Debug.DrawLine( from , to , color , duration );
         }
-
-        public static void LineOffset( Vector3 from , Vector3 offset , Color color = default( Color ) , float duration = 0 )
-        {
-            Debug.DrawLine( from , from + offset , color , duration );
-        }
     }
 
     public class Game
@@ -146,6 +141,9 @@ namespace BreakIO
 
             for ( int i = 0 ; connections.Count > i ; i++ )
                 Draw.LineFromTo( connections[ i ].a.position , connections[ i ].b.position , Color.yellow );
+
+            for ( int i = 0 ; links.Count > i ; i++ )
+                Draw.LineFromTo( links[ i ].master.node.position , links[ i ].slave.node.position , Color.green );
         }
 
         private bool Overlap ( Vector3 positionA , float radiusA , Vector3 positionB , float radiusB )
@@ -302,26 +300,36 @@ namespace BreakIO
             return terminal;
         }
 
-        private IEnumerator AddConnectionHandler( Node a )
+        private IEnumerator AddConnectionHandler( Node from )
         {
-            Node b = null;
+            Node to = null;
             addingConnection = true;
 
             while ( Input.GetMouseButton( 0 ) )
             {
-                Draw.LineFromTo( a.position , currentWorldMousePosition , Color.red );
-                b = nearestNode.Contains( currentWorldMousePosition ) ? nearestNode : b;
+                Draw.LineFromTo( from.position , currentWorldMousePosition , Color.red );
+                to = nearestNode.Contains( currentWorldMousePosition ) ? nearestNode : to;
                 yield return null;
             }
 
-            if ( b != a && b != null && !HasConnection( a , b ) )
+            if ( to != from && to != null )
             {
-                if ( b.terminal == null )
-                    b.AddTerminal();
+                if ( HasConnection( from , to ) )
+                {
 
-                Connection connection = AddConnection( a , b , a );
-                b.AddConnection( connection );
-                a.AddConnection( connection );
+                    Link link = new Link( GetConnection( from , to ) , from , to );
+                    from.terminal.AddLink( link );
+                    to.terminal.AddLink( link );
+                }
+                else
+                {
+                    if ( to.terminal == null )
+                        to.AddTerminal();
+
+                    Connection connection = AddConnection( from , to , from );
+                    to.AddConnection( connection );
+                    from.AddConnection( connection );
+                }
             }
 
             addingConnection = false;
@@ -346,7 +354,12 @@ namespace BreakIO
                     index = i;
 
             if ( index >= 0 )
+            {
+                if ( HasLink( connections[ index ].a , connections[ index ].b ) )
+                    GetLink( connections[ index ].a , connections[ index ].b ).Destroy();
+
                 connections[ index ].Destroy();
+            }
 
             removingConnection = false;
         }
@@ -381,11 +394,30 @@ namespace BreakIO
 
         public bool HasConnection ( Node a , Node b )
         {
-            for ( int i = 0 ; connections.Count > i ; i++ )
-                if ( connections[ i ].Has( a ) && connections[ i ].Has( b ) )
-                    return true;
+            return GetConnection( a , b ) != null;
+        }
 
-            return false;
+        public Connection GetConnection ( Node a , Node b )
+        {
+            for ( int i = 0 ; connections.Count > i ; i++ )
+                if ( connections[ i ].Connects( a , b ) )
+                    return connections[ i ];
+
+            return null;
+        }
+        
+        public bool HasLink ( Node a , Node b )
+        {
+            return GetLink( a , b ) != null;
+        }
+
+        public Link GetLink( Node a , Node b )
+        {
+            for ( int i = 0 ; links.Count > i ; i++ )
+                if ( links[ i ].Has( a ) && links[ i ].Has( b ) )
+                    return links[ i ];
+
+            return null;
         }
 
         public int NearestIndex ( Vector3 position )
@@ -487,7 +519,6 @@ namespace BreakIO
         public List<Network> networks { get; private set; }
         public List<Terminal> terminals { get; private set; }
         public List<Connection> connections { get; private set; }
-
         
         private Mesh mesh { get; set; }
         private MonoBehaviour client { get; set; }
@@ -562,13 +593,23 @@ namespace BreakIO
 
     public class Link
     {
-        public Link SetSlave ( Node slave )
+        public bool Links ( Node a , Node b )
+        {
+            return Has( a ) && Has( b );
+        }
+
+        public bool Has ( Node node )
+        {
+            return master.node == node || slave.node == node;
+        }
+
+        public Link SetSlave( Terminal slave )
         {
             this.slave = slave;
             return this;
         }
 
-        public Link SetMaster ( Node master )
+        public Link SetMaster( Terminal master )
         {
             this.master = master;
             return this;
@@ -576,36 +617,106 @@ namespace BreakIO
 
         public Link Destroy()
         {
-            connection.level.RemoveLink( this );
+            master.RemoveLink( this );
+            slave.RemoveLink( this );
+            level.RemoveLink( this );
             connection = null;
             master = null;
             slave = null;
             return this;
         }
 
-        public Node slave { get; private set; }
-        public Node master { get; private set; }
+        public Terminal slave { get; private set; }
+        public Terminal master { get; private set; }
         public Connection connection { get; private set; }
+        public Level level { get { return connection.level; } }
 
         public Link ( Connection connection , Node master , Node slave )
         {
             this.connection = connection;
-            this.master = master;
-            this.slave = slave;
+            this.master = master.terminal;
+            this.slave = slave.terminal;
+        }
+    }
+
+    public class Signal
+    {
+        public Signal Route ( Terminal.Mode mode )
+        {
+            switch ( mode )
+            {
+                case Terminal.Mode.Home:
+                    return Halt();
+
+                case Terminal.Mode.Plus:
+                    return Plus();
+
+                case Terminal.Mode.Minus:
+                    return Minus();
+
+                default:
+                    return this;
+            }
+        }
+
+        public Signal Plus()
+        {
+            strength += 1;
+            return this;
+        }
+
+        public Signal Minus()
+        {
+            strength -= 1;
+            return this;
+        }
+
+        public Signal Halt()
+        {
+            strength = 0;
+            return this;
+        }
+
+        public Signal Route( Terminal from , Terminal to )
+        {
+            this.from = from;
+            route.Add( from );
+            to.RouteSignal( this );
+            return this;
+        }
+
+        public Terminal from { get; private set; }
+        public int strength { get; private set; }
+
+        private List<Terminal> route { get; set; }
+
+        public Signal( Terminal from , int strength )
+        {
+            this.from = from;
+            this.strength = strength;
+            route = new List<Terminal>();
         }
     }
 
     public class Terminal
     {
+        //TODO: determine whether this is even necessary at all
+        //there's probably a cooler architecture
+        public Terminal RouteSignal ( Signal signal )
+        {
+            signal.Route( mode );
+            return this;
+        }
+
         public Terminal SetMode ( Mode mode )
         {
             this.mode = mode;
             return this;
         }
 
-        public Terminal AddLink ( Connection connection , Node master , Node slave )
+        public Terminal AddLink ( Link link )
         {
-            links.Add( connection.level.AddLink( new Link( connection , master , slave ) ) );
+            links.Add( level.AddLink( link ) );
             return this;
         }
 
@@ -640,6 +751,7 @@ namespace BreakIO
             return this;
         }
 
+        public Level level { get { return node.level; } }
         public List<Link> links { get; private set; }
         public Node node { get; private set; }
         public Mode mode { get; private set; }
@@ -706,7 +818,9 @@ namespace BreakIO
                 connections[ connections.Count - 1 ].Destroy();
 
             level.RemoveNode( this );
+            terminal.Destroy();
             connections = null;
+            terminal = null;
             network = null;
             return this;
         }
@@ -717,11 +831,7 @@ namespace BreakIO
             {
                 float increment = 360 / Mathf.Max( 1 , ( network.nodes.Count - 1 ) );
                 float angle = increment * ( network.nodes.Count == 2 && index == 0 ? 1.5f : index );
-
-                if ( angle > 0 )
-                    return network.position + ( Quaternion.AngleAxis( angle , Vector3.forward ) * Vector3.up ) * ( network.radius - ( radius * 1.5f ) );
-                else
-                    return network.position;
+                return network.position + ( angle > 0 ? ( Quaternion.AngleAxis( angle , Vector3.forward ) * Vector3.up ) * ( network.radius - ( radius * 1.5f ) ) : Vector3.zero );
             }
         }
 
@@ -836,7 +946,6 @@ namespace BreakIO
                 case 9:
                     return 0.5f;
             }
-
         }
 
         public float radius { get { return Radius( nodes.Count ); } }
@@ -859,6 +968,11 @@ namespace BreakIO
 
     public class Connection
     {
+        public bool Connects ( Node a , Node b )
+        {
+            return Has( a ) && Has( b );
+        }
+
         public Node Other ( Node node )
         {
             return node == a ? b : a;
