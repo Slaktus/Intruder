@@ -103,9 +103,7 @@ namespace BreakIO
 
     public class Level
     {
-        public void GameUpdate()
-        {
-        }
+        public void GameUpdate() { }
 
         public void EditorUpdate()
         {
@@ -316,7 +314,6 @@ namespace BreakIO
             {
                 if ( HasConnection( from , to ) )
                 {
-
                     Link link = new Link( GetConnection( from , to ) , from , to );
                     from.terminal.AddLink( link );
                     to.terminal.AddLink( link );
@@ -641,6 +638,14 @@ namespace BreakIO
 
     public class Signal
     {
+        public Signal Route( Terminal from , Terminal to )
+        {
+            this.from = from;
+            route.Add( from );
+            to.RouteSignal( this );
+            return this;
+        }
+
         public Signal Route ( Terminal.Mode mode )
         {
             switch ( mode )
@@ -659,29 +664,21 @@ namespace BreakIO
             }
         }
 
-        public Signal Plus()
+        private Signal Plus()
         {
             strength += 1;
             return this;
         }
 
-        public Signal Minus()
+        private Signal Minus()
         {
             strength -= 1;
             return this;
         }
 
-        public Signal Halt()
+        private Signal Halt()
         {
             strength = 0;
-            return this;
-        }
-
-        public Signal Route( Terminal from , Terminal to )
-        {
-            this.from = from;
-            route.Add( from );
-            to.RouteSignal( this );
             return this;
         }
 
@@ -700,8 +697,6 @@ namespace BreakIO
 
     public class Terminal
     {
-        //TODO: determine whether this is even necessary at all
-        //there's probably a cooler architecture
         public Terminal RouteSignal ( Signal signal )
         {
             signal.Route( mode );
@@ -736,7 +731,7 @@ namespace BreakIO
 
         public Terminal RemoveLink( Link link )
         {
-            links.Remove( link.Destroy() );
+            links.Remove( link );
             return this;
         }
 
@@ -817,8 +812,10 @@ namespace BreakIO
             while ( connections.Count > 0 )
                 connections[ connections.Count - 1 ].Destroy();
 
+            if ( terminal != null )
+                terminal.Destroy();
+
             level.RemoveNode( this );
-            terminal.Destroy();
             connections = null;
             terminal = null;
             network = null;
