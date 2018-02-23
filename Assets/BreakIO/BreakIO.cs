@@ -33,6 +33,34 @@ namespace BreakIO
         {
             Debug.DrawLine( from , to , color , duration );
         }
+
+        public static void Terminal ( Terminal terminal )
+        {
+            Vector3 position = terminal.node.position;
+
+            switch ( terminal.mode )
+            {
+                case global::BreakIO.Terminal.Mode.Multiply:
+                    LineFromTo( position + ( Vector3.left * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.right * 0.025f ) + ( Vector3.down * 0.025f ) , Color.green );
+                    LineFromTo( position + ( Vector3.right * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.left * 0.025f ) + ( Vector3.down * 0.025f ) , Color.green );
+                    break;
+
+                case global::BreakIO.Terminal.Mode.Minus:
+                    LineFromTo( position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.green );
+                    break;
+
+                case global::BreakIO.Terminal.Mode.Home:
+                    LineFromTo( position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.green );
+                    LineFromTo( position + ( Vector3.left * 0.025f ) + ( Vector3.up * 0.04f ) , position + ( Vector3.left * 0.025f ) + ( Vector3.down * 0.04f ) , Color.green );
+                    LineFromTo( position + ( Vector3.right * 0.025f ) + ( Vector3.up * 0.04f ) , position + ( Vector3.right * 0.025f ) + ( Vector3.down * 0.04f ) , Color.green );
+                    break;
+
+                case global::BreakIO.Terminal.Mode.Plus:
+                    LineFromTo( position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.green );
+                    LineFromTo( position + ( Vector3.up * 0.025f ) , position + ( Vector3.down * 0.025f ) , Color.green );
+                    break;
+            }
+        }
     }
 
     public class Game
@@ -206,6 +234,9 @@ namespace BreakIO
             for ( int i = 0 ; nodes.Count > i ; i++ )
                 Draw.Circle( nodes[ i ].position , nodes[ i ].radius , hoverNode == nodes[ i ] ? Color.red : nodes[ i ].terminal != null ? Color.green : Color.yellow );
 
+            for ( int i = 0 ; terminals.Count > i ; i++ )
+                Draw.Terminal( terminals[ i ] );
+
             for ( int i = 0 ; connections.Count > i ; i++ )
                 Draw.LineFromTo( connections[ i ].a.position , connections[ i ].b.position , Color.yellow );
 
@@ -220,20 +251,9 @@ namespace BreakIO
 
         private static Vector2 IntersectionPoint( Vector2 a1 , Vector2 a2 , Vector2 b1 , Vector2 b2 )
         {
-            float d =
-                ( b2.y - b1.y ) * ( a2.x - a1.x )
-                -
-                ( b2.x - b1.x ) * ( a2.y - a1.y );
-
-            float a =
-                ( b2.x - b1.x ) * ( a1.y - b1.y )
-                -
-                ( b2.y - b1.y ) * ( a1.x - b1.x );
-
-            float b =
-                ( a2.x - a1.x ) * ( a1.y - b1.y )
-                -
-                ( a2.y - a1.y ) * ( a1.x - b1.x );
+            float d = ( b2.y - b1.y ) * ( a2.x - a1.x ) - ( b2.x - b1.x ) * ( a2.y - a1.y );
+            float a = ( b2.x - b1.x ) * ( a1.y - b1.y ) - ( b2.y - b1.y ) * ( a1.x - b1.x );
+            float b = ( a2.x - a1.x ) * ( a1.y - b1.y ) - ( a2.y - a1.y ) * ( a1.x - b1.x );
 
             if ( d == 0 )
                 return Vector3.zero;
@@ -275,7 +295,7 @@ namespace BreakIO
 
         private void TryRemoveNode()
         {
-            if ( Input.GetMouseButtonDown( 1 ) && hoverNode != null && hoverNode.terminal == null )
+            if ( Input.GetMouseButtonUp( 1 ) && hoverNode != null && hoverNode.terminal == null )
                 hoverNetwork.RemoveNode( hoverNode );
         }
 
@@ -287,7 +307,7 @@ namespace BreakIO
 
         private void TryRemoveNetwork()
         {
-            if ( Input.GetMouseButtonDown( 1 ) && NetworkAtIndex( nearestIndex ) != null && NetworkAtIndex( nearestIndex ).nodes.Count == 0 )
+            if ( Input.GetMouseButtonUp( 1 ) && NetworkAtIndex( nearestIndex ) != null && NetworkAtIndex( nearestIndex ).nodes.Count == 0 )
                 RemoveNetwork( nearestIndex );
         }
 
@@ -300,18 +320,13 @@ namespace BreakIO
         private void TrySwapTerminal()
         {
             if ( !addingConnection && Input.GetMouseButtonDown( 0 ) && hoverNode != null && hoverNode.terminal != null )
-                hoverNode.terminal.SetMode( hoverNode.terminal.mode + 1 > Terminal.Mode.Count - 1 ? Terminal.Mode.Home : hoverNode.terminal.mode + 1 );
+                hoverNode.terminal.SetMode( hoverNode.terminal.mode + 1 > Terminal.Mode.Count - 1 ? Terminal.Mode.None : hoverNode.terminal.mode + 1 );
         }
 
         private void TryRemoveTerminal()
         {
-            if ( !removingConnection && Input.GetMouseButtonDown( 1 ) && hoverNode != null && hoverNode.terminal != null )
-            {
+            if ( !removingConnection && Input.GetMouseButtonUp( 1 ) && hoverNode != null && hoverNode.terminal != null )
                 hoverNode.RemoveTerminal();
-
-                while ( hoverNode.connections.Count > 0 )
-                    RemoveConnection( hoverNode.connections[ hoverNode.connections.Count - 1 ] );
-            }
         }
 
         private void TryAddConnection()
@@ -345,6 +360,7 @@ namespace BreakIO
                     Link link = new Link( GetConnection( from , to ) , from , to );
                     from.terminal.AddLink( link );
                     to.terminal.AddLink( link );
+                    AddLink( link );
                 }
                 else
                 {
@@ -445,14 +461,14 @@ namespace BreakIO
             return null;
         }
 
-        private T Nearest<T> ( List<T> candidates ) where T : Common
+        private T Nearest<T> ( Vector3 position , List<T> candidates ) where T : Common
         {
             int index = -1;
             float shortest = float.PositiveInfinity;
 
-            for ( int i = 0 ; nodes.Count > i ; i++ )
+            for ( int i = 0 ; candidates.Count > i ; i++ )
             {
-                float distance = Vector3.Distance( currentWorldMousePosition , nodes[ i ].position );
+                float distance = Vector3.Distance( position , candidates[ i ].position );
 
                 if ( shortest > distance )
                 {
@@ -472,17 +488,17 @@ namespace BreakIO
 
                 for ( int i = 0 ; networks.Count > i ; i++ )
                 {
-                    Node nearest = networks[ i ].NearestNode( currentWorldMousePosition );
+                    Node nearest = Nearest( currentWorldMousePosition , networks[ i ].nodes );
 
                     if ( nearest != null )
                         nodes.Add( nearest );
                 }
 
-                return Nearest( nodes );
+                return Nearest( currentWorldMousePosition , nodes );
             }
         }
 
-        public Network nearestNetwork { get { return Nearest( networks ); } }
+        public Network nearestNetwork { get { return Nearest( currentWorldMousePosition , networks ); } }
 
         public Vector3 currentGridMousePosition { get; private set; }
         public Vector3 currentWorldMousePosition { get; private set; }
@@ -696,7 +712,7 @@ namespace BreakIO
 
         public Terminal AddLink ( Link link )
         {
-            links.Add( level.AddLink( link ) );
+            links.Add( link );
             return this;
         }
 
@@ -716,6 +732,7 @@ namespace BreakIO
 
         public Terminal RemoveLink( Link link )
         {
+            level.RemoveLink( link );
             links.Remove( link );
             return this;
         }
@@ -913,10 +930,10 @@ namespace BreakIO
         public override float radius { get { return Radius( nodes.Count ); } }
         public override Vector3 position { get { return level[ index ]; } }
 
-        public int index { get; private set; }
         public List<Connection> connections { get; private set; }
         public List<Node> nodes { get; private set; }
         public Level level { get; private set; }
+        public int index { get; private set; }
 
         public Network ( Level level , int index )
         {
@@ -926,12 +943,6 @@ namespace BreakIO
             connections = new List<Connection>();
             nodes.Add( level.AddNode( this ) );
         }
-    }
-
-    public abstract class Common
-    {
-        public abstract float radius { get; }
-        public abstract Vector3 position { get; }
     }
 
     public class Connection
@@ -969,5 +980,11 @@ namespace BreakIO
             this.b = b;
             this.level = level;
         }
+    }
+
+    public abstract class Common
+    {
+        public abstract float radius { get; }
+        public abstract Vector3 position { get; }
     }
 }
