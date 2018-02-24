@@ -15,7 +15,7 @@ namespace BreakIO
 
     public static class Draw
     {
-        public static bool Arrow ( Vector3 position , Vector3 direction , float size )
+        public static bool Arrow( Vector3 position , Vector3 direction , float size )
         {
             Vector3 perpendicularA = new Vector3( -direction.y , direction.x );
             Vector3 perpendicularB = -perpendicularA;
@@ -50,7 +50,7 @@ namespace BreakIO
             Debug.DrawLine( from , to , color , duration );
         }
 
-        public static void Terminal ( Terminal terminal )
+        public static void Terminal( Terminal terminal )
         {
             Vector3 position = terminal.node.position;
 
@@ -76,6 +76,73 @@ namespace BreakIO
                     Line( position + ( Vector3.up * 0.025f ) , position + ( Vector3.down * 0.025f ) , Color.green );
                     break;
             }
+        }
+
+        public static bool Circle<T> ( T common , Color color = default( Color ) , float duration = 0 , int resolution = 20 ) where T : Common
+        {
+            List<LineRenderer> lineRenderers = common is Node ? _nodeLineRenderers : _networkLineRenderers;
+            List<Common> items = common is Node ? _nodes : _networks;
+            bool registered = items.Contains( common );
+
+            if ( registered )
+            {
+                float radius = common.radius;
+                Vector3 position = common.position;
+                float increment = 360 / resolution;
+                Vector3[] points = new Vector3[ resolution ];
+                LineRenderer lineRenderer = lineRenderers[ items.IndexOf( common ) ];
+
+                for ( int i = 0 ; resolution > i ; i++ )
+                    points[ i ] = position + ( Quaternion.AngleAxis( increment * i , Vector3.forward ) * Vector3.up ) * radius;
+
+                lineRenderer.positionCount = points.Length;
+                lineRenderer.SetPositions( points );
+            }
+
+            return registered;
+        }
+
+        public static void Register( Node node , LineRendererSettings settings )
+        {
+            _nodes.Add( node );
+            _nodeLineRenderers.Add( settings.Apply( new GameObject( "NodeLineRenderer" + _nodes.Count ).AddComponent<LineRenderer>() ) );
+        }
+
+        public static void Deregister( Node node )
+        {
+            LineRenderer lineRenderer = _nodeLineRenderers[ _nodes.IndexOf( node ) ];
+
+            _nodes.Remove( node );
+            _nodeLineRenderers.Remove( lineRenderer );
+            GameObject.Destroy( lineRenderer.gameObject );
+        }
+
+        public static void Register( Network network , LineRendererSettings settings )
+        {
+            _networks.Add( network );
+            _networkLineRenderers.Add( settings.Apply( new GameObject( "NetworkLineRenderer" + _networks.Count ).AddComponent<LineRenderer>() ) );
+        }
+
+        public static void Deregister( Network network )
+        {
+            LineRenderer lineRenderer = _networkLineRenderers[ _networks.IndexOf( network ) ];
+
+            _networks.Remove( network );
+            _networkLineRenderers.Remove( lineRenderer );
+            GameObject.Destroy( lineRenderer.gameObject );
+        }
+
+        private static List<Common> _nodes { get; set; }
+        private static List<Common> _networks { get; set; }
+        private static List<LineRenderer> _nodeLineRenderers { get; set; }
+        private static List<LineRenderer> _networkLineRenderers { get; set; }
+
+        static Draw()
+        {
+            _nodes = new List<Common>();
+            _networks = new List<Common>();
+            _nodeLineRenderers = new List<LineRenderer>();
+            _networkLineRenderers = new List<LineRenderer>();
         }
     }
 
@@ -213,10 +280,10 @@ namespace BreakIO
                 Draw.Circle( nearestGridPosition , 0.125f , Color.red );
 
             for ( int i = 0 ; networks.Count > i ; i++ )
-                Draw.Circle( networks[ i ].position , networks[ i ].radius , hoverNetwork == networks[ i ] ? Color.red : Color.yellow );
+                Draw.Circle( networks[ i ] , hoverNetwork == networks[ i ] ? Color.red : Color.yellow );
 
             for ( int i = 0 ; nodes.Count > i ; i++ )
-                Draw.Circle( nodes[ i ].position , nodes[ i ].radius , hoverNode == nodes[ i ] ? Color.red : nodes[ i ].terminal != null ? Color.green : Color.yellow );
+                Draw.Circle( nodes[ i ] , hoverNode == nodes[ i ] ? Color.red : nodes[ i ].terminal != null ? Color.green : Color.yellow );
 
             for ( int i = 0 ; terminals.Count > i ; i++ )
                 Draw.Terminal( terminals[ i ] );
@@ -646,12 +713,12 @@ namespace BreakIO
 
         IEnumerator SignalHandler( float delay , MonoBehaviour client )
         {
-            while ( delay > 0 && connection != null && master != null && slave != null )
+            while ( delay > 0 && connection != null && master != null && slave != null && master.node != null && slave.node != null )
                 yield return delay -= Time.deltaTime;
 
             float t = 0;
 
-            while ( 1 > t && connection != null && master != null && slave != null )
+            while ( 1 > t && connection != null && master != null && slave != null && master.node != null && slave.node != null )
                 yield return Draw.Arrow( Vector3.Lerp( master.node.position , slave.node.position , t += Time.deltaTime ) , ( slave.node.position - master.node.position ).normalized , 0.05f );
         }
 
@@ -865,6 +932,8 @@ namespace BreakIO
             connections = null;
             terminal = null;
             network = null;
+
+            Draw.Deregister( this );
             return this;
         }
 
@@ -887,8 +956,9 @@ namespace BreakIO
 
         public Node ( Network network )
         {
-            connections = new List<Connection>();
             this.network = network;
+            connections = new List<Connection>();
+            Draw.Register( this , new LineRendererSettings( 1 , 0 , 0.01f , Color.white ) );
         }
     }
 
@@ -952,6 +1022,8 @@ namespace BreakIO
             connections = null;
             nodes = null;
             level = null;
+
+            Draw.Deregister( this );
             return this;
         }
 
@@ -995,6 +1067,7 @@ namespace BreakIO
             nodes = new List<Node>( 9 );
             connections = new List<Connection>();
             nodes.Add( level.AddNode( this ) );
+            Draw.Register( this , new LineRendererSettings( 1 , 0 , 0.01f , Color.white ) );
         }
     }
 
@@ -1039,5 +1112,50 @@ namespace BreakIO
     {
         public abstract float radius { get; }
         public abstract Vector3 position { get; }
+    }
+
+    public struct LineRendererSettings
+    {
+        public LineRenderer Apply ( LineRenderer lineRenderer )
+        {
+            lineRenderer.shadowCastingMode = shadowCastingMode;
+            lineRenderer.numCornerVertices = numCornerVertices;
+            lineRenderer.receiveShadows = receiveShadows;
+            lineRenderer.numCapVertices = numCapVertices;
+            lineRenderer.startWidth = startWidth;
+            lineRenderer.startColor = startColor;
+            lineRenderer.alignment = alignment;
+            lineRenderer.endWidth = endWidth;
+            lineRenderer.endColor = endColor;
+            lineRenderer.loop = loop;
+            return lineRenderer;
+        }
+
+        public UnityEngine.Rendering.ShadowCastingMode shadowCastingMode { get; private set; }
+        public LineAlignment alignment { get; private set; }
+        public int numCornerVertices { get; private set; }
+        public bool receiveShadows { get; private set; }
+        public int numCapVertices { get; private set; }
+        public float startWidth { get; private set; }
+        public Color startColor { get; private set; }
+        public float endWidth { get; private set; }
+        public Color endColor { get; private set; }
+        public bool loop { get; private set; }
+
+        public LineRendererSettings( int numCornerVertices , int numCapVertices , float width , Color color , bool loop = true )
+        {
+            shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            alignment = LineAlignment.Local;
+            receiveShadows = false;
+
+            this.numCornerVertices = numCornerVertices;
+            this.numCapVertices = numCapVertices;
+            this.loop = loop;
+
+            startWidth = width;
+            startColor = color;
+            endWidth = width;
+            endColor = color;
+        }
     }
 }
