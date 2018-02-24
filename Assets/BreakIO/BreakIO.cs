@@ -15,7 +15,7 @@ namespace BreakIO
 
     public static class Draw
     {
-        public static void Arrow ( Vector3 position , Vector3 direction , float size )
+        public static bool Arrow ( Vector3 position , Vector3 direction , float size )
         {
             Vector3 perpendicularA = new Vector3( -direction.y , direction.x );
             Vector3 perpendicularB = -perpendicularA;
@@ -24,12 +24,13 @@ namespace BreakIO
             Vector3 bottomA = position + ( ( -direction + perpendicularA ).normalized * size * 0.5f );
             Vector3 bottomB = position + ( ( -direction + perpendicularB ).normalized * size * 0.5f );
 
-            LineFromTo( top , bottomA , Color.green );
-            LineFromTo( bottomB , top , Color.green );
-            LineFromTo( bottomA , bottomB , Color.green );
+            Line( top , bottomA , Color.green );
+            Line( bottomB , top , Color.green );
+            Line( bottomA , bottomB , Color.green );
+            return true;
         }
 
-        public static void Circle( Vector3 position , float radius , Color color = default( Color ) , float duration = 0 , int resolution = 20 )
+        public static bool Circle( Vector3 position , float radius , Color color = default( Color ) , float duration = 0 , int resolution = 20 )
         {
             float increment = 360 / resolution;
             Vector3[] points = new Vector3[ resolution ];
@@ -38,12 +39,13 @@ namespace BreakIO
                 points[ i ] = position + ( Quaternion.AngleAxis( increment * i , Vector3.forward ) * Vector3.up ) * radius;
 
             for ( int i = 0 ; resolution - 1 > i ; i++ )
-                LineFromTo( points[ i ] , points[ i + 1 ] , color , duration );
+                Line( points[ i ] , points[ i + 1 ] , color , duration );
 
-            LineFromTo( points[ resolution - 1 ] , points[ 0 ] , color , duration );
+            Line( points[ resolution - 1 ] , points[ 0 ] , color , duration );
+            return true;
         }
 
-        public static void LineFromTo( Vector3 from , Vector3 to , Color color = default( Color ) , float duration = 0 )
+        public static void Line( Vector3 from , Vector3 to , Color color = default( Color ) , float duration = 0 )
         {
             Debug.DrawLine( from , to , color , duration );
         }
@@ -55,23 +57,23 @@ namespace BreakIO
             switch ( terminal.mode )
             {
                 case global::BreakIO.Terminal.Mode.Multiply:
-                    LineFromTo( position + ( Vector3.left * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.right * 0.025f ) + ( Vector3.down * 0.025f ) , Color.green );
-                    LineFromTo( position + ( Vector3.right * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.left * 0.025f ) + ( Vector3.down * 0.025f ) , Color.green );
+                    Line( position + ( Vector3.left * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.right * 0.025f ) + ( Vector3.down * 0.025f ) , Color.green );
+                    Line( position + ( Vector3.right * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.left * 0.025f ) + ( Vector3.down * 0.025f ) , Color.green );
                     break;
 
                 case global::BreakIO.Terminal.Mode.Minus:
-                    LineFromTo( position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.green );
+                    Line( position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.green );
                     break;
 
                 case global::BreakIO.Terminal.Mode.Home:
-                    LineFromTo( position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.green );
-                    LineFromTo( position + ( Vector3.left * 0.025f ) + ( Vector3.up * 0.04f ) , position + ( Vector3.left * 0.025f ) + ( Vector3.down * 0.04f ) , Color.green );
-                    LineFromTo( position + ( Vector3.right * 0.025f ) + ( Vector3.up * 0.04f ) , position + ( Vector3.right * 0.025f ) + ( Vector3.down * 0.04f ) , Color.green );
+                    Line( position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.green );
+                    Line( position + ( Vector3.left * 0.025f ) + ( Vector3.up * 0.04f ) , position + ( Vector3.left * 0.025f ) + ( Vector3.down * 0.04f ) , Color.green );
+                    Line( position + ( Vector3.right * 0.025f ) + ( Vector3.up * 0.04f ) , position + ( Vector3.right * 0.025f ) + ( Vector3.down * 0.04f ) , Color.green );
                     break;
 
                 case global::BreakIO.Terminal.Mode.Plus:
-                    LineFromTo( position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.green );
-                    LineFromTo( position + ( Vector3.up * 0.025f ) , position + ( Vector3.down * 0.025f ) , Color.green );
+                    Line( position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.green );
+                    Line( position + ( Vector3.up * 0.025f ) , position + ( Vector3.down * 0.025f ) , Color.green );
                     break;
             }
         }
@@ -220,10 +222,10 @@ namespace BreakIO
                 Draw.Terminal( terminals[ i ] );
 
             for ( int i = 0 ; connections.Count > i ; i++ )
-                Draw.LineFromTo( connections[ i ].a.position , connections[ i ].b.position , Color.yellow );
+                Draw.Line( connections[ i ].a.position , connections[ i ].b.position , Color.yellow );
 
             for ( int i = 0 ; links.Count > i ; i++ )
-                Draw.LineFromTo( links[ i ].master.node.position , links[ i ].slave.node.position , Color.green );
+                Draw.Line( links[ i ].master.node.position , links[ i ].slave.node.position , Color.green );
         }
 
         private static bool Overlap ( Vector3 positionA , float radiusA , Vector3 positionB , float radiusB )
@@ -330,7 +332,7 @@ namespace BreakIO
 
             while ( Input.GetMouseButton( 0 ) )
             {
-                Draw.LineFromTo( from.position , currentWorldMousePosition , Color.red );
+                Draw.Line( from.position , currentWorldMousePosition , Color.red );
                 to = Overlap( currentWorldMousePosition , 0 , nearestNode.position , nearestNode.radius ) ? nearestNode : to;
                 yield return null;
             }
@@ -365,7 +367,7 @@ namespace BreakIO
 
             while ( Input.GetMouseButton( 1 ) )
             {
-                Draw.LineFromTo( start , currentWorldMousePosition , Color.red );
+                Draw.Line( start , currentWorldMousePosition , Color.red );
                 yield return null;
             }
 
@@ -619,40 +621,38 @@ namespace BreakIO
 
         IEnumerator SignalDispatcher( MonoBehaviour client )
         {
-            while ( _signalQueue.Count > 0 )
+            while ( _signalQueue.Count > 0 && master != null && slave != null )
             {
                 Signal signal = master.Process( _signalQueue.Peek() );
                 float delay = 1f / signal.strength;
 
                 for ( int i = 0 ; signal.strength > i ; i++ )
-                    client.StartCoroutine( SignalHandler( slave , delay * i , client ) );
+                    client.StartCoroutine( SignalHandler( delay * i , client ) );
 
                 if ( signal.strength > 0 )
                 {
                     float wait = 1;
 
-                    while ( wait > 0 )
+                    while ( wait > 0 && master != null && slave != null )
                         yield return wait -= Time.deltaTime;
 
-                    signal.Route( master , slave , client );
+                    if ( master != null && slave != null )
+                        signal.Route( master , slave , client );
                 }
 
                 _signalQueue.Dequeue();
             }
         }
 
-        IEnumerator SignalHandler( Terminal slave , float delay , MonoBehaviour client )
+        IEnumerator SignalHandler( float delay , MonoBehaviour client )
         {
-            while ( delay > 0 )
+            while ( delay > 0 && connection != null && master != null && slave != null )
                 yield return delay -= Time.deltaTime;
 
             float t = 0;
 
-            while ( 1 > t )
-            {
-                Draw.Arrow( Vector3.Lerp( master.node.position , slave.node.position , t += Time.deltaTime ) , ( slave.node.position - master.node.position ).normalized , 0.05f );
-                yield return null;
-            }
+            while ( 1 > t && connection != null && master != null && slave != null )
+                yield return Draw.Arrow( Vector3.Lerp( master.node.position , slave.node.position , t += Time.deltaTime ) , ( slave.node.position - master.node.position ).normalized , 0.05f );
         }
 
         public Terminal slave { get; private set; }
