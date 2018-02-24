@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
-using System;
 
 namespace BreakIO
 {
@@ -15,6 +15,20 @@ namespace BreakIO
 
     public static class Draw
     {
+        public static void Arrow ( Vector3 position , Vector3 direction , float size )
+        {
+            Vector3 perpendicularA = new Vector3( -direction.y , direction.x );
+            Vector3 perpendicularB = -perpendicularA;
+
+            Vector3 top = position + ( direction * size * 0.5f );
+            Vector3 bottomA = position + ( ( -direction + perpendicularA ).normalized * size * 0.5f );
+            Vector3 bottomB = position + ( ( -direction + perpendicularB ).normalized * size * 0.5f );
+
+            LineFromTo( top , bottomA , Color.green );
+            LineFromTo( bottomB , top , Color.green );
+            LineFromTo( bottomA , bottomB , Color.green );
+        }
+
         public static void Circle( Vector3 position , float radius , Color color = default( Color ) , float duration = 0 , int resolution = 20 )
         {
             float increment = 360 / resolution;
@@ -67,65 +81,19 @@ namespace BreakIO
     {
         private IEnumerator Handler()
         {
-            Func<IEnumerator> game = GameHandler;
-            Func<IEnumerator> editor = EditorHandler;
-            IEnumerator handler = default( IEnumerator );
-
             while ( true )
-            {
-                handler = this.editor ? editor() : game();
-
-                while ( handler.MoveNext() )
-                    yield return handler.Current;
-            }
+                yield return level.EditorUpdate( _client );
         }
 
-        public IEnumerator GameHandler()
-        {
-            Mode mode = this.mode;
-
-            while ( mode == this.mode )
-            {
-                level.GameUpdate();
-                yield return null;
-            }
-        }
-
-        public IEnumerator EditorHandler()
-        {
-            Mode mode = this.mode;
-
-            while ( mode == this.mode )
-            {
-                level.EditorUpdate();
-                yield return null;
-            }
-        }
-
-        public Game SetMode ( Mode mode )
-        {
-            this.mode = mode;
-            return this;
-        }
-
-        public Mode mode { get; private set; }
         public Level level { get; private set; }
-        public bool editor { get { return mode == Mode.Editor; } }
 
-        private MonoBehaviour client { get; set; }
+        private MonoBehaviour _client { get; set; }
 
         public Game ( int width , int height , float spacing , MonoBehaviour client )
         {
-            mode = Mode.Editor;
-            this.client = client;
+            _client = client;
             level = new Level( width , height , spacing , client );
             client.StartCoroutine( Handler() );
-        }
-
-        public enum Mode
-        {
-            Game,
-            Editor
         }
     }
 
@@ -133,8 +101,20 @@ namespace BreakIO
     {
         public void GameUpdate() { }
 
-        public void EditorUpdate()
+        private float signalTime = 0;
+        private float signalInterval = 1;
+
+        public bool EditorUpdate( MonoBehaviour client )
         {
+            if ( Time.time > signalTime + signalInterval )
+            {
+                for ( int i = 0 ; terminals.Count > i ; i++ )
+                    if ( terminals[ i ].mode == Terminal.Mode.Home )
+                        terminals[ i ].RouteSignal( new Signal( terminals[ i ] , 1 ) , client );
+
+                signalTime = Time.time;
+            }
+
             UpdateMousePosition();
             TrySwapTerminal();
             TryAddTerminal();
@@ -146,6 +126,8 @@ namespace BreakIO
             TryRemoveNetwork();
             TryAddNetwork();
             EditorDraw();
+
+            return true;
         }
 
         public Network AddNetwork( int index )
@@ -153,6 +135,32 @@ namespace BreakIO
             Network network = new Network( this , index );
             networks.Add( network );
             return network;
+        }
+
+        public Node AddNode( Network network )
+        {
+            Node node = new Node( network );
+            nodes.Add( node );
+            return node;
+        }
+
+        public Connection AddConnection( Node a , Node b , Node master )
+        {
+            Connection connection = new Connection( a , b , this );
+            connections.Add( connection );
+            return connection;
+        }
+
+        public Link AddLink( Link link )
+        {
+            links.Add( link );
+            return link;
+        }
+
+        public Terminal AddTerminal( Terminal terminal )
+        {
+            terminals.Add( terminal );
+            return terminal;
         }
 
         public Network RemoveNetwork( int index )
@@ -165,24 +173,10 @@ namespace BreakIO
             return network;
         }
 
-        public Node AddNode( Network network )
-        {
-            Node node = new Node( network );
-            nodes.Add( node );
-            return node;
-        }
-
         public Node RemoveNode( Node node )
         {
             nodes.Remove( node );
             return node;
-        }
-
-        public Connection AddConnection( Node a , Node b , Node master )
-        {
-            Connection connection = new Connection( a , b , this );
-            connections.Add( connection );
-            return connection;
         }
 
         public Connection RemoveConnection( Connection connection )
@@ -193,22 +187,10 @@ namespace BreakIO
             return connection;
         }
 
-        public Link AddLink( Link link )
-        {
-            links.Add( link );
-            return link;
-        }
-
         public Link RemoveLink( Link link )
         {
             links.Remove( link );
             return link;
-        }
-
-        public Terminal AddTerminal( Terminal terminal )
-        {
-            terminals.Add( terminal );
-            return terminal;
         }
 
         public Terminal RemoveTerminal( Terminal terminal )
@@ -615,71 +597,98 @@ namespace BreakIO
 
         public Link Destroy()
         {
+            connection.level.RemoveLink( this );
             master.RemoveLink( this );
             slave.RemoveLink( this );
-            level.RemoveLink( this );
             connection = null;
             master = null;
             slave = null;
             return this;
         }
 
+        public Link Signal( Signal signal , MonoBehaviour client )
+        {
+            bool start = _signalQueue.Count == 0;
+            _signalQueue.Enqueue( signal );
+
+            if ( start )
+                client.StartCoroutine( SignalDispatcher( client ) );
+
+            return this;
+        }
+
+        IEnumerator SignalDispatcher( MonoBehaviour client )
+        {
+            while ( _signalQueue.Count > 0 )
+            {
+                Signal signal = master.Process( _signalQueue.Peek() );
+                float delay = 1f / signal.strength;
+
+                for ( int i = 0 ; signal.strength > i ; i++ )
+                    client.StartCoroutine( SignalHandler( slave , delay * i , client ) );
+
+                if ( signal.strength > 0 )
+                {
+                    float wait = 1;
+
+                    while ( wait > 0 )
+                        yield return wait -= Time.deltaTime;
+
+                    signal.Route( master , slave , client );
+                }
+
+                _signalQueue.Dequeue();
+            }
+        }
+
+        IEnumerator SignalHandler( Terminal slave , float delay , MonoBehaviour client )
+        {
+            while ( delay > 0 )
+                yield return delay -= Time.deltaTime;
+
+            float t = 0;
+
+            while ( 1 > t )
+            {
+                Draw.Arrow( Vector3.Lerp( master.node.position , slave.node.position , t += Time.deltaTime ) , ( slave.node.position - master.node.position ).normalized , 0.05f );
+                yield return null;
+            }
+        }
+
         public Terminal slave { get; private set; }
         public Terminal master { get; private set; }
         public Connection connection { get; private set; }
-        public Level level { get { return connection.level; } }
+
+        private Queue<Signal> _signalQueue { get; set; }
 
         public Link ( Connection connection , Node master , Node slave )
         {
             this.connection = connection;
             this.master = master.terminal;
             this.slave = slave.terminal;
+            _signalQueue = new Queue<Signal>( 10 );
         }
     }
 
     public class Signal
     {
-        public Signal Route( Terminal from , Terminal to )
+        public Signal Route( Terminal from , Terminal to , MonoBehaviour client )
         {
             this.from = from;
             route.Add( from );
-            to.RouteSignal( this );
+            to.RouteSignal( this , client );
             return this;
         }
 
-        public Signal Route ( Terminal.Mode mode )
-        {
-            switch ( mode )
-            {
-                case Terminal.Mode.Home:
-                    return Halt();
-
-                case Terminal.Mode.Plus:
-                    return Plus();
-
-                case Terminal.Mode.Minus:
-                    return Minus();
-
-                default:
-                    return this;
-            }
-        }
-
-        private Signal Plus()
+        public  Signal Plus()
         {
             strength += 1;
             return this;
         }
 
-        private Signal Minus()
+        public Signal Minus()
         {
             strength -= 1;
-            return this;
-        }
-
-        private Signal Halt()
-        {
-            strength = 0;
             return this;
         }
 
@@ -694,14 +703,57 @@ namespace BreakIO
             this.strength = strength;
             route = new List<Terminal>();
         }
+
+        public Signal( Signal signal )
+        {
+            from = signal.from;
+            strength = signal.strength;
+            route = new List<Terminal>( signal.route );
+        }
     }
 
     public class Terminal
     {
-        public Terminal RouteSignal ( Signal signal )
+        public Terminal RouteSignal( Signal signal , MonoBehaviour client )
         {
-            signal.Route( mode );
+            List<int> indices = new List<int>();
+
+            for ( int i = 0 ; links.Count > i ; i++ )
+                if ( links[ i ].master == this )
+                    indices.Add( i );
+
+            if ( indices.Count > 0 )
+            {
+
+                if ( _broadcast )
+                    for ( int i = 0 ; indices.Count > i ; i++ )
+                        links[ indices[ i ] ].Signal( new Signal( signal ) , client );
+                else
+                {
+                    int index = indices.IndexOf( _currentLink );
+                    index = 0 > index || index + 1 >= indices.Count ? 0 : index + 1;
+                    links[ _currentLink = indices[ index ] ].Signal( new Signal( signal ) , client );
+                }
+            }
+            else
+                _currentLink = -1;
+
             return this;
+        }
+
+        public Signal Process( Signal signal )
+        {
+            switch ( mode )
+            {
+                case Mode.Plus:
+                    return signal.Plus();
+
+                case Mode.Minus:
+                    return signal.Minus();
+
+                default:
+                    return signal;
+            }
         }
 
         public Terminal SetMode ( Mode mode )
@@ -732,7 +784,7 @@ namespace BreakIO
 
         public Terminal RemoveLink( Link link )
         {
-            level.RemoveLink( link );
+            node.network.level.RemoveLink( link );
             links.Remove( link );
             return this;
         }
@@ -742,16 +794,18 @@ namespace BreakIO
             while ( links.Count > 0 )
                 RemoveLink( links[ links.Count - 1 ] );
 
-            node.level.RemoveTerminal( this );
+            node.network.level.RemoveTerminal( this );
             links = null;
             node = null;
             return this;
         }
 
-        public Level level { get { return node.level; } }
         public List<Link> links { get; private set; }
         public Node node { get; private set; }
         public Mode mode { get; private set; }
+
+        private int _currentLink { get; set; }
+        private bool _broadcast { get { return mode == Mode.Multiply; } }
 
         public Terminal( Node node )
         {
@@ -775,7 +829,7 @@ namespace BreakIO
         public Terminal AddTerminal()
         {
             if ( terminal == null )
-                terminal = level.AddTerminal( new Terminal( this ) );
+                terminal = network.level.AddTerminal( new Terminal( this ) );
 
             return terminal;
         }
@@ -807,7 +861,7 @@ namespace BreakIO
             if ( terminal != null )
                 terminal.Destroy();
 
-            level.RemoveNode( this );
+            network.level.RemoveNode( this );
             connections = null;
             terminal = null;
             network = null;
@@ -828,7 +882,6 @@ namespace BreakIO
 
         public Network network { get; private set; }
         public Terminal terminal { get; private set; }
-        public Level level { get { return network.level; } }
         public List<Connection> connections { get; private set; }
         public int index { get { return network.nodes.IndexOf( this ); } }
 
