@@ -78,19 +78,20 @@ namespace BreakIO
             }
         }
 
-        public static bool Circle<T> ( T common , Color color = default( Color ) , float duration = 0 , int resolution = 20 ) where T : Common
+        public static bool Circle<T> ( T item , Color color = default( Color ) , float duration = 0 , int resolution = 20 ) where T : Common
         {
-            List<LineRenderer> lineRenderers = common is Node ? _nodeLineRenderers : _networkLineRenderers;
-            List<Common> items = common is Node ? _nodes : _networks;
-            bool registered = items.Contains( common );
+            List<LineRenderer> lineRenderers = GetLineRenderers( item );
+            List<Common> items = GetItems( item );
+
+            bool registered = items.Contains( item );
 
             if ( registered )
             {
-                float radius = common.radius;
-                Vector3 position = common.position;
+                float radius = item.radius;
+                Vector3 position = item.position;
                 float increment = 360 / resolution;
                 Vector3[] points = new Vector3[ resolution ];
-                LineRenderer lineRenderer = lineRenderers[ items.IndexOf( common ) ];
+                LineRenderer lineRenderer = lineRenderers[ items.IndexOf( item ) ];
 
                 for ( int i = 0 ; resolution > i ; i++ )
                     points[ i ] = position + ( Quaternion.AngleAxis( increment * i , Vector3.forward ) * Vector3.up ) * radius;
@@ -102,36 +103,40 @@ namespace BreakIO
             return registered;
         }
 
-        public static void Register( Node node , LineRendererSettings settings )
+        public static void Register<T>( T item , LineRendererSettings settings ) where T : Common
         {
-            _nodes.Add( node );
-            _nodeLineRenderers.Add( settings.Apply( new GameObject( "NodeLineRenderer" + _nodes.Count ).AddComponent<LineRenderer>() ) );
+            List<LineRenderer> lineRenderers = GetLineRenderers( item );
+            List<Common> items = GetItems( item );
+
+            LineRenderer lineRenderer = settings.Apply( new GameObject( ( item is Node ? "Node" : "Network" ) + ( "LineRenderer" + items.Count ) ).AddComponent<LineRenderer>() );
+            lineRenderer.transform.SetParent( _parent.transform );
+            lineRenderers.Add( lineRenderer );
+            items.Add( item );
         }
 
-        public static void Deregister( Node node )
+        public static void Deregister<T>( T item ) where T : Common
         {
-            LineRenderer lineRenderer = _nodeLineRenderers[ _nodes.IndexOf( node ) ];
+            List<LineRenderer> lineRenderers = GetLineRenderers( item );
+            List<Common> items = GetItems( item );
 
-            _nodes.Remove( node );
-            _nodeLineRenderers.Remove( lineRenderer );
+            LineRenderer lineRenderer = _nodeLineRenderers[ items.IndexOf( item ) ];
+
+            items.Remove( item );
+            lineRenderers.Remove( lineRenderer );
             GameObject.Destroy( lineRenderer.gameObject );
         }
 
-        public static void Register( Network network , LineRendererSettings settings )
+        private static List<Common> GetItems<T> ( T item ) where T : Common
         {
-            _networks.Add( network );
-            _networkLineRenderers.Add( settings.Apply( new GameObject( "NetworkLineRenderer" + _networks.Count ).AddComponent<LineRenderer>() ) );
+            return item is Node ? _nodes : _networks;
         }
 
-        public static void Deregister( Network network )
+        private static List<LineRenderer> GetLineRenderers<T>( T item ) where T : Common
         {
-            LineRenderer lineRenderer = _networkLineRenderers[ _networks.IndexOf( network ) ];
-
-            _networks.Remove( network );
-            _networkLineRenderers.Remove( lineRenderer );
-            GameObject.Destroy( lineRenderer.gameObject );
+            return item is Node ? _nodeLineRenderers : _networkLineRenderers;
         }
 
+        private static GameObject _parent { get; set; }
         private static List<Common> _nodes { get; set; }
         private static List<Common> _networks { get; set; }
         private static List<LineRenderer> _nodeLineRenderers { get; set; }
@@ -141,6 +146,7 @@ namespace BreakIO
         {
             _nodes = new List<Common>();
             _networks = new List<Common>();
+            _parent = new GameObject( "Draw" );
             _nodeLineRenderers = new List<LineRenderer>();
             _networkLineRenderers = new List<LineRenderer>();
         }
