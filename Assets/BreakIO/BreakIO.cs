@@ -62,6 +62,18 @@ namespace BreakIO
             Debug.DrawLine( from , to , color , duration );
         }
 
+        public static void Line( LineRenderer lineRenderer , Vector3 from , Vector3 to , Color color = default( Color ) )
+        {
+            lineRenderer.positionCount = 2;
+            lineRenderer.SetPositions( new Vector3[] { from , to } );
+            lineRenderer.material.color = color;
+        }
+
+        public static void Line<T> ( T line , Color color = default( Color ) ) where T : ILine
+        {
+            Line( _lineRenderers[ _registered.IndexOf( line ) ] , line.from , line.to , color );
+        }
+
         public static void Terminal( Terminal terminal )
         {
             Vector3 position = terminal.node.position;
@@ -90,22 +102,22 @@ namespace BreakIO
             }
         }
 
-        public static bool Circle<T> ( T item , Color color = default( Color ) , int resolution = 20 ) where T : Common
+        public static bool Circle<T> ( T circle , Color color = default( Color ) , int resolution = 20 ) where T : ICircle
         {
-            bool registered = _items.Contains( item );
+            bool registered = _registered.Contains( circle );
 
             if ( registered )
-                Circle( _lineRenderers[ _items.IndexOf( item ) ] , item.position , item.radius , color , resolution );
+                Circle( _lineRenderers[ _registered.IndexOf( circle ) ] , circle.position , circle.radius , color , resolution );
 
             return registered;
         }
 
-        public static bool LineRendererColor<T>( T item , Color color ) where T : Common
+        public static bool LineRendererColor<T>( T circle , Color color ) where T : ICircle
         {
-            bool registered = _items.Contains( item );
+            bool registered = _registered.Contains( circle );
 
             if ( registered )
-                LineRendererColor( _lineRenderers[ _items.IndexOf( item ) ] , color );
+                LineRendererColor( _lineRenderers[ _registered.IndexOf( circle ) ] , color );
 
             return registered;
         }
@@ -130,17 +142,17 @@ namespace BreakIO
             return true;
         }
 
-        public static void Register<T>( T item , LineRendererSettings settings ) where T : Common
+        public static void Register<T>( T item , LineRendererSettings settings ) where T : IBase
         {
-            _lineRenderers.Add( GetLineRenderer( ( item is Node ? "Node" : "Network" ) + ( "LineRenderer" + _items.Count ) , settings ) );
-            _items.Add( item );
+            _lineRenderers.Add( GetLineRenderer( typeof( T ).Name + ( "LineRenderer" + _registered.Count ) , settings ) );
+            _registered.Add( item );
         }
 
-        public static void Deregister<T>( T item ) where T : Common
+        public static void Deregister<T>( T item ) where T : IBase
         {
-            LineRenderer lineRenderer = _lineRenderers[ _items.IndexOf( item ) ];
+            LineRenderer lineRenderer = _lineRenderers[ _registered.IndexOf( item ) ];
 
-            _items.Remove( item );
+            _registered.Remove( item );
             _lineRenderers.Remove( lineRenderer );
             GameObject.Destroy( lineRenderer.gameObject );
         }
@@ -153,14 +165,19 @@ namespace BreakIO
             return lineRenderer;
         }
 
+        public static void RemoveLineRenderer ( LineRenderer lineRenderer )
+        {
+            GameObject.Destroy( lineRenderer.gameObject );
+        }
+
         private static Material _material { get; set; }
         private static GameObject _parent { get; set; }
-        private static List<Common> _items { get; set; }
+        private static List<IBase> _registered { get; set; }
         private static List<LineRenderer> _lineRenderers { get; set; }
 
         static Draw()
         {
-            _items = new List<Common>();
+            _registered = new List<IBase>();
             _parent = new GameObject( "Draw" );
             _lineRenderers = new List<LineRenderer>();
         }
@@ -292,17 +309,24 @@ namespace BreakIO
         {
             for ( int i = 0 ; grid.width * grid.height > i ; i++ )
             {
-                Draw.LineRendererColor( lineRenderers[ i ] , Overlap( currentWorldMousePosition , 0.01f , this[ i ] , 0.125f ) ? Color.red : Color.blue );
+
+                Draw.LineRendererColor( lineRenderers[ i ] , Overlap( currentWorldMousePosition , 0.01f , this[ i ] , 0.125f ) ? Color.magenta : Color.cyan );
                 lineRenderers[ i ].enabled = !Overlap( this[ i ] , 0.125f ) && NetworkAtIndex( i ) == null;
             }
 
             Draw.Circle( currentValidMousePosition , 0.01f , Color.red );
 
             for ( int i = 0 ; networks.Count > i ; i++ )
-                Draw.Circle( networks[ i ] , hoverNetwork == networks[ i ] ? Color.red : Color.yellow );
+                Draw.Circle( networks[ i ] , hoverNetwork == networks[ i ] ? Color.magenta : Color.yellow );
 
             for ( int i = 0 ; nodes.Count > i ; i++ )
-                Draw.Circle( nodes[ i ] , hoverNode == nodes[ i ] ? Color.red : nodes[ i ].terminal != null ? Color.green : Color.yellow );
+                Draw.Circle( nodes[ i ] , hoverNode == nodes[ i ] ? Color.magenta : nodes[ i ].terminal != null ? Color.green : Color.yellow );
+
+            for ( int i = 0 ; connections.Count > i ; i++ )
+                Draw.Line( connections[ i ] , Color.white );
+
+            for ( int i = 0 ; links.Count > i ; i++ )
+                Draw.Line( links[ i ] , Color.green );
 
             /*
             for ( int i = 0 ; terminals.Count > i ; i++ )
@@ -314,11 +338,6 @@ namespace BreakIO
             for ( int i = 0 ; links.Count > i ; i++ )
                 Draw.Line( links[ i ].master.node.position , links[ i ].slave.node.position , Color.green );
             */
-        }
-
-        private static bool Overlap ( Vector3 positionA , float radiusA , Vector3 positionB , float radiusB )
-        {
-            return Mathf.Abs( radiusA + radiusB ) > Vector3.Distance( positionA , positionB );
         }
 
         private static Vector2 IntersectionPoint( Vector2 a1 , Vector2 a2 , Vector2 b1 , Vector2 b2 )
@@ -338,9 +357,14 @@ namespace BreakIO
                 : Vector2.zero;
         }
 
-        private bool Overlap<T> ( T item ) where T : Common
+        private static bool Overlap ( Vector3 positionA , float radiusA , Vector3 positionB , float radiusB )
         {
-            return Overlap( item.position , item.radius );
+            return Mathf.Abs( radiusA + radiusB ) > Vector3.Distance( positionA , positionB );
+        }
+
+        private bool Overlap<T> ( T circle ) where T : ICircle
+        {
+            return Overlap( circle.position , circle.radius );
         }
 
         private bool Overlap ( Vector3 position , float radius )
@@ -422,10 +446,11 @@ namespace BreakIO
         {
             Node to = null;
             addingConnection = true;
+            LineRenderer lineRenderer = Draw.GetLineRenderer( "AddConnection" , new LineRendererSettings( 1 , 1 , 0.01f , Color.white , false ) );
 
             while ( Input.GetMouseButton( 0 ) )
             {
-                Draw.Line( from.position , currentWorldMousePosition , Color.red );
+                Draw.Line( lineRenderer , from.position + ( ( currentWorldMousePosition - from.position ).normalized * from.radius ) , currentWorldMousePosition , Color.white );
                 to = Overlap( currentWorldMousePosition , 0 , nearestNode.position , nearestNode.radius ) ? nearestNode : to;
                 yield return null;
             }
@@ -450,6 +475,7 @@ namespace BreakIO
                 }
             }
 
+            Draw.RemoveLineRenderer( lineRenderer );
             addingConnection = false;
         }
 
@@ -457,10 +483,11 @@ namespace BreakIO
         {
             removingConnection = true;
             Vector3 start = currentWorldMousePosition;
+            LineRenderer lineRenderer = Draw.GetLineRenderer( "RemoveConnection" , new LineRendererSettings( 1 , 1 , 0.01f , Color.red , false ) );
 
             while ( Input.GetMouseButton( 1 ) )
             {
-                Draw.Line( start , currentWorldMousePosition , Color.red );
+                Draw.Line( lineRenderer , start , currentWorldMousePosition , Color.red );
                 yield return null;
             }
 
@@ -479,6 +506,7 @@ namespace BreakIO
                 connections[ index ].Destroy();
             }
 
+            Draw.RemoveLineRenderer( lineRenderer );
             removingConnection = false;
         }
 
@@ -538,7 +566,7 @@ namespace BreakIO
             return null;
         }
 
-        private T Nearest<T> ( Vector3 position , List<T> candidates ) where T : Common
+        private T Nearest<T> ( Vector3 position , List<T> candidates ) where T : ICircle
         {
             int index = -1;
             float shortest = float.PositiveInfinity;
@@ -554,7 +582,7 @@ namespace BreakIO
                 }
             }
 
-            return index >= 0 ? candidates[ index ] : null;
+            return index >= 0 ? candidates[ index ] : default(T);
         }
 
         public Node nearestNode
@@ -676,7 +704,7 @@ namespace BreakIO
         }
     }
 
-    public class Link
+    public class Link : ILine
     {
         public bool Links ( Node a , Node b )
         {
@@ -705,6 +733,7 @@ namespace BreakIO
             connection.level.RemoveLink( this );
             master.RemoveLink( this );
             slave.RemoveLink( this );
+            Draw.Deregister( this );
             connection = null;
             master = null;
             slave = null;
@@ -758,6 +787,9 @@ namespace BreakIO
                 yield return Draw.Arrow( Vector3.Lerp( master.node.position , slave.node.position , t += Time.deltaTime ) , ( slave.node.position - master.node.position ).normalized , 0.05f );
         }
 
+        public Vector3 from { get { return master.node.position + ( ( slave.node.position - master.node.position ).normalized * master.node.radius ); } }
+        public Vector3 to { get { return slave.node.position + ( ( master.node.position - slave.node.position ).normalized * slave.node.radius ); } }
+
         public Terminal slave { get; private set; }
         public Terminal master { get; private set; }
         public Connection connection { get; private set; }
@@ -770,6 +802,8 @@ namespace BreakIO
             this.master = master.terminal;
             this.slave = slave.terminal;
             _signalQueue = new Queue<Signal>( 10 );
+            Draw.Register( this , new LineRendererSettings( 1 , 1 , 0.02f , Color.white , false ) );
+            Draw.Line( this , Color.green );
         }
     }
 
@@ -927,7 +961,7 @@ namespace BreakIO
         }
     }
 
-    public class Node : Common
+    public class Node : ICircle
     {
         public Terminal AddTerminal()
         {
@@ -965,15 +999,14 @@ namespace BreakIO
                 terminal.Destroy();
 
             network.level.RemoveNode( this );
+            Draw.Deregister( this );
             connections = null;
             terminal = null;
             network = null;
-
-            Draw.Deregister( this );
             return this;
         }
 
-        public override Vector3 position
+        public Vector3 position
         {
             get
             {
@@ -983,7 +1016,7 @@ namespace BreakIO
             }
         }
 
-        public override float radius { get { return 0.0625f; } }
+        public float radius { get { return 0.0625f; } }
 
         public Network network { get; private set; }
         public Terminal terminal { get; private set; }
@@ -999,7 +1032,7 @@ namespace BreakIO
         }
     }
 
-    public class Network : Common
+    public class Network : ICircle
     {
         public void AddNode()
         {
@@ -1056,11 +1089,10 @@ namespace BreakIO
             while ( nodes.Count > 0 )
                 nodes.Remove( nodes[ nodes.Count - 1 ].Destroy() );
 
+            Draw.Deregister( this );
             connections = null;
             nodes = null;
             level = null;
-
-            Draw.Deregister( this );
             return this;
         }
 
@@ -1089,8 +1121,8 @@ namespace BreakIO
             }
         }
 
-        public override float radius { get { return Radius( nodes.Count ); } }
-        public override Vector3 position { get { return level[ index ]; } }
+        public float radius { get { return Radius( nodes.Count ); } }
+        public Vector3 position { get { return level[ index ]; } }
 
         public List<Connection> connections { get; private set; }
         public List<Node> nodes { get; private set; }
@@ -1109,7 +1141,7 @@ namespace BreakIO
         }
     }
 
-    public class Connection
+    public class Connection : ILine
     {
         public bool Connects ( Node a , Node b )
         {
@@ -1129,10 +1161,14 @@ namespace BreakIO
         public Connection Destroy()
         {
             level.RemoveConnection( this );
+            Draw.Deregister( this );
             a = null;
             b = null;
             return this;
         }
+
+        public Vector3 from { get { return a.position + ( ( b.position - a.position ).normalized * a.radius ); } }
+        public Vector3 to { get { return b.position + ( ( a.position - b.position ).normalized * a.radius ); } }
 
         public Node a { get; private set; }
         public Node b { get; private set; }
@@ -1143,14 +1179,24 @@ namespace BreakIO
             this.a = a;
             this.b = b;
             this.level = level;
+            Draw.Register( this , new LineRendererSettings( 1 , 1 , 0.01f , Color.white , false ) );
+            Draw.Line( this , Color.white );
         }
     }
 
-    public abstract class Common
+    public interface ILine : IBase
     {
-        public abstract float radius { get; }
-        public abstract Vector3 position { get; }
+        Vector3 from { get; }
+        Vector3 to { get; }
     }
+
+    public interface ICircle : IBase
+    {
+        float radius { get; }
+        Vector3 position { get; }
+    }
+
+    public interface IBase { }
 
     public struct LineRendererSettings
     {
