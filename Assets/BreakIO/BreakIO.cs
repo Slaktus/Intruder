@@ -7,7 +7,14 @@ namespace BreakIO
 {
     public class BreakIO : MonoBehaviour
     {
+        public Material lineMaterial;
+
         private void Awake()
+        {
+            Draw.SetMaterial( lineMaterial );
+        }
+
+        private void Start()
         {
             new Game( 6 , 6 , 0.3f , this );
         }
@@ -15,6 +22,11 @@ namespace BreakIO
 
     public static class Draw
     {
+        public static void SetMaterial ( Material material )
+        {
+            _material = material;
+        }
+
         public static bool Arrow( Vector3 position , Vector3 direction , float size )
         {
             Vector3 perpendicularA = new Vector3( -direction.y , direction.x );
@@ -78,77 +90,79 @@ namespace BreakIO
             }
         }
 
-        public static bool Circle<T> ( T item , Color color = default( Color ) , float duration = 0 , int resolution = 20 ) where T : Common
+        public static bool Circle<T> ( T item , Color color = default( Color ) , int resolution = 20 ) where T : Common
         {
-            List<LineRenderer> lineRenderers = GetLineRenderers( item );
-            List<Common> items = GetItems( item );
-
-            bool registered = items.Contains( item );
+            bool registered = _items.Contains( item );
 
             if ( registered )
-            {
-                float radius = item.radius;
-                Vector3 position = item.position;
-                float increment = 360 / resolution;
-                Vector3[] points = new Vector3[ resolution ];
-                LineRenderer lineRenderer = lineRenderers[ items.IndexOf( item ) ];
-
-                for ( int i = 0 ; resolution > i ; i++ )
-                    points[ i ] = position + ( Quaternion.AngleAxis( increment * i , Vector3.forward ) * Vector3.up ) * radius;
-
-                lineRenderer.positionCount = points.Length;
-                lineRenderer.SetPositions( points );
-            }
+                Circle( _lineRenderers[ _items.IndexOf( item ) ] , item.position , item.radius , color , resolution );
 
             return registered;
         }
 
+        public static bool LineRendererColor<T>( T item , Color color ) where T : Common
+        {
+            bool registered = _items.Contains( item );
+
+            if ( registered )
+                LineRendererColor( _lineRenderers[ _items.IndexOf( item ) ] , color );
+
+            return registered;
+        }
+
+        public static bool LineRendererColor( LineRenderer lineRenderer , Color color )
+        {
+            lineRenderer.material.color = color;
+            return true;
+        }
+
+        public static bool Circle ( LineRenderer lineRenderer , Vector3 position , float radius , Color color = default( Color ) , int resolution = 20 )
+        {
+            float increment = 360 / resolution;
+            Vector3[] points = new Vector3[ resolution ];
+
+            for ( int i = 0 ; resolution > i ; i++ )
+                points[ i ] = position + ( Quaternion.AngleAxis( increment * i , Vector3.forward ) * Vector3.up ) * radius;
+
+            lineRenderer.positionCount = points.Length;
+            lineRenderer.SetPositions( points );
+            lineRenderer.material.color = color;
+            return true;
+        }
+
         public static void Register<T>( T item , LineRendererSettings settings ) where T : Common
         {
-            List<LineRenderer> lineRenderers = GetLineRenderers( item );
-            List<Common> items = GetItems( item );
-
-            LineRenderer lineRenderer = settings.Apply( new GameObject( ( item is Node ? "Node" : "Network" ) + ( "LineRenderer" + items.Count ) ).AddComponent<LineRenderer>() );
-            lineRenderer.transform.SetParent( _parent.transform );
-            lineRenderers.Add( lineRenderer );
-            items.Add( item );
+            _lineRenderers.Add( GetLineRenderer( ( item is Node ? "Node" : "Network" ) + ( "LineRenderer" + _items.Count ) , settings ) );
+            _items.Add( item );
         }
 
         public static void Deregister<T>( T item ) where T : Common
         {
-            List<LineRenderer> lineRenderers = GetLineRenderers( item );
-            List<Common> items = GetItems( item );
+            LineRenderer lineRenderer = _lineRenderers[ _items.IndexOf( item ) ];
 
-            LineRenderer lineRenderer = _nodeLineRenderers[ items.IndexOf( item ) ];
-
-            items.Remove( item );
-            lineRenderers.Remove( lineRenderer );
+            _items.Remove( item );
+            _lineRenderers.Remove( lineRenderer );
             GameObject.Destroy( lineRenderer.gameObject );
         }
 
-        private static List<Common> GetItems<T> ( T item ) where T : Common
+        public static LineRenderer GetLineRenderer( string name , LineRendererSettings settings )
         {
-            return item is Node ? _nodes : _networks;
+            LineRenderer lineRenderer = settings.Apply( new GameObject( name ).AddComponent<LineRenderer>() );
+            lineRenderer.transform.SetParent( _parent.transform );
+            lineRenderer.material = new Material( _material );
+            return lineRenderer;
         }
 
-        private static List<LineRenderer> GetLineRenderers<T>( T item ) where T : Common
-        {
-            return item is Node ? _nodeLineRenderers : _networkLineRenderers;
-        }
-
+        private static Material _material { get; set; }
         private static GameObject _parent { get; set; }
-        private static List<Common> _nodes { get; set; }
-        private static List<Common> _networks { get; set; }
-        private static List<LineRenderer> _nodeLineRenderers { get; set; }
-        private static List<LineRenderer> _networkLineRenderers { get; set; }
+        private static List<Common> _items { get; set; }
+        private static List<LineRenderer> _lineRenderers { get; set; }
 
         static Draw()
         {
-            _nodes = new List<Common>();
-            _networks = new List<Common>();
+            _items = new List<Common>();
             _parent = new GameObject( "Draw" );
-            _nodeLineRenderers = new List<LineRenderer>();
-            _networkLineRenderers = new List<LineRenderer>();
+            _lineRenderers = new List<LineRenderer>();
         }
     }
 
@@ -277,13 +291,12 @@ namespace BreakIO
         private void EditorDraw()
         {
             for ( int i = 0 ; grid.width * grid.height > i ; i++ )
-                if ( NetworkAtIndex( i ) == null && !Overlap( this[ i ] , 0.125f ) )
-                    Draw.Circle( this[ i ] , 0.125f , Color.blue );
+            {
+                Draw.LineRendererColor( lineRenderers[ i ] , Overlap( currentWorldMousePosition , 0.01f , this[ i ] , 0.125f ) ? Color.red : Color.blue );
+                lineRenderers[ i ].enabled = !Overlap( this[ i ] , 0.125f ) && NetworkAtIndex( i ) == null;
+            }
 
             Draw.Circle( currentValidMousePosition , 0.01f , Color.red );
-
-            if ( NetworkAtIndex( nearestIndex ) == null && 0.125f > Vector3.Distance( this[ nearestIndex ] , currentValidMousePosition ) && !Overlap( this[ nearestIndex ] , 0.125f ) )
-                Draw.Circle( nearestGridPosition , 0.125f , Color.red );
 
             for ( int i = 0 ; networks.Count > i ; i++ )
                 Draw.Circle( networks[ i ] , hoverNetwork == networks[ i ] ? Color.red : Color.yellow );
@@ -291,6 +304,7 @@ namespace BreakIO
             for ( int i = 0 ; nodes.Count > i ; i++ )
                 Draw.Circle( nodes[ i ] , hoverNode == nodes[ i ] ? Color.red : nodes[ i ].terminal != null ? Color.green : Color.yellow );
 
+            /*
             for ( int i = 0 ; terminals.Count > i ; i++ )
                 Draw.Terminal( terminals[ i ] );
 
@@ -299,6 +313,7 @@ namespace BreakIO
 
             for ( int i = 0 ; links.Count > i ; i++ )
                 Draw.Line( links[ i ].master.node.position , links[ i ].slave.node.position , Color.green );
+            */
         }
 
         private static bool Overlap ( Vector3 positionA , float radiusA , Vector3 positionB , float radiusB )
@@ -321,6 +336,11 @@ namespace BreakIO
             return ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1
                 ? new Vector2( a1.x + ( ua * ( a2.x - a1.x ) ) , a1.y + ( ua * ( a2.y - a1.y ) ) )
                 : Vector2.zero;
+        }
+
+        private bool Overlap<T> ( T item ) where T : Common
+        {
+            return Overlap( item.position , item.radius );
         }
 
         private bool Overlap ( Vector3 position , float radius )
@@ -580,6 +600,8 @@ namespace BreakIO
         private bool addingConnection { get; set; }
         private bool removingConnection { get; set; }
         private MeshCollider meshCollider { get; set; }
+        private List<LineRenderer> lineRenderers { get; set; }
+
 
         public Level ( int width , int height , float spacing , MonoBehaviour client = null , float padding = -1 )
         {
@@ -617,6 +639,14 @@ namespace BreakIO
                 this.client = client;
                 meshCollider.transform.SetParent( client.transform );
             }
+
+            lineRenderers = new List<LineRenderer>( width * height );
+
+            for ( int i = 0 ; width * height > i ; i++ )
+                lineRenderers.Add( Draw.GetLineRenderer( "Grid" + i , new LineRendererSettings( 1 , 1 , 0.01f , Color.white ) ) );
+
+            for ( int i = 0 ; width * height > i ; i++ )
+                Draw.Circle( lineRenderers[ i ] , this[ i ] , 0.125f , Color.white );
         }
     }
 
@@ -965,6 +995,7 @@ namespace BreakIO
             this.network = network;
             connections = new List<Connection>();
             Draw.Register( this , new LineRendererSettings( 1 , 0 , 0.01f , Color.white ) );
+            Draw.Circle( this , Color.white );
         }
     }
 
@@ -1074,6 +1105,7 @@ namespace BreakIO
             connections = new List<Connection>();
             nodes.Add( level.AddNode( this ) );
             Draw.Register( this , new LineRendererSettings( 1 , 0 , 0.01f , Color.white ) );
+            Draw.Circle( this , Color.white );
         }
     }
 
