@@ -11,7 +11,7 @@ namespace BreakIO
 
         private void Awake()
         {
-            Draw.SetMaterial( lineMaterial );
+            Draw.Initialize( lineMaterial , gameObject );
         }
 
         private void Start()
@@ -22,9 +22,10 @@ namespace BreakIO
 
     public static class Draw
     {
-        public static void SetMaterial ( Material material )
+        public static void Initialize ( Material material , GameObject parent )
         {
             _material = material;
+            _parent.transform.SetParent( parent.transform );
         }
 
         public static bool Arrow<T>( T arrow , Vector3 position , Vector3 direction , Color color = default( Color ) ) where T : IArrow
@@ -134,7 +135,16 @@ namespace BreakIO
 
         public static void Register<T>( T item , LineRendererSettings settings ) where T : IBase
         {
-            _lineRenderers.Add( GetLineRenderer( typeof( T ).Name + ( "LineRenderer" + _registered.Count ) , settings ) );
+            Type type = typeof( T );
+
+            if ( !_types.Contains( type  ) )
+            {
+                _types.Add( type );
+                _parents.Add( new GameObject( type.Name ) );
+                _parents[ _types.IndexOf( type ) ].transform.SetParent( _parent.transform );
+            }
+
+            _lineRenderers.Add( GetLineRenderer( type.Name , settings , _parents[ _types.IndexOf( type ) ] ) );
             _registered.Add( item );
         }
 
@@ -147,10 +157,10 @@ namespace BreakIO
             GameObject.Destroy( lineRenderer.gameObject );
         }
 
-        public static LineRenderer GetLineRenderer( string name , LineRendererSettings settings )
+        public static LineRenderer GetLineRenderer( string name , LineRendererSettings settings , GameObject parent = null )
         {
             LineRenderer lineRenderer = settings.Apply( new GameObject( name ).AddComponent<LineRenderer>() );
-            lineRenderer.transform.SetParent( _parent.transform );
+            lineRenderer.transform.SetParent( parent != null ? parent.transform : _misc.transform );
             lineRenderer.material = new Material( _material );
             return lineRenderer;
         }
@@ -160,16 +170,23 @@ namespace BreakIO
             GameObject.Destroy( lineRenderer.gameObject );
         }
 
+        private static GameObject _misc { get; set; }
+        private static List<Type> _types { get; set; }
         private static Material _material { get; set; }
         private static GameObject _parent { get; set; }
         private static List<IBase> _registered { get; set; }
+        private static List<GameObject> _parents { get; set; }
         private static List<LineRenderer> _lineRenderers { get; set; }
 
         static Draw()
         {
+            _types = new List<Type>();
             _registered = new List<IBase>();
+            _misc = new GameObject( "Misc" );
+            _parents = new List<GameObject>();
             _parent = new GameObject( "Draw" );
             _lineRenderers = new List<LineRenderer>();
+            _misc.transform.SetParent( _parent.transform );
         }
     }
 
@@ -652,7 +669,7 @@ namespace BreakIO
             lineRenderers = new List<LineRenderer>( width * height );
 
             for ( int i = 0 ; width * height > i ; i++ )
-                lineRenderers.Add( Draw.GetLineRenderer( "Grid" + i , new LineRendererSettings( 1 , 1 , 0.01f , Color.white ) ) );
+                lineRenderers.Add( Draw.GetLineRenderer( "Grid" , new LineRendererSettings( 1 , 1 , 0.01f , Color.white ) ) );
 
             for ( int i = 0 ; width * height > i ; i++ )
                 Draw.Circle( lineRenderers[ i ] , this[ i ] , Vector3.forward , 0.125f , Color.white );
