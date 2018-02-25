@@ -29,18 +29,18 @@ namespace BreakIO
 
         public static bool Arrow<T>( T arrow , Vector3 position , Vector3 direction , Color color = default( Color ) ) where T : IArrow
         {
-            Arrow( _lineRenderers[ _registered.IndexOf( arrow ) ] , position , direction , arrow.length , color );
+            Arrow( _lineRenderers[ _registered.IndexOf( arrow ) ] , position , direction , arrow.offset , arrow.length , color );
             return true;
         }
 
-        public static bool Arrow( LineRenderer lineRenderer , Vector3 position , Vector3 direction , float length , Color color = default( Color ) )
+        public static bool Arrow( LineRenderer lineRenderer , Vector3 position , Vector3 direction , Vector3 offset , float length , Color color = default( Color ) )
         {
             Vector3 perpendicularA = new Vector3( -direction.y , direction.x );
             Vector3 perpendicularB = -perpendicularA;
 
-            Vector3 top = position + ( direction * length * 0.5f );
-            Vector3 bottomA = position + ( ( -direction + perpendicularA ).normalized * length * 0.5f );
-            Vector3 bottomB = position + ( ( -direction + perpendicularB ).normalized * length * 0.5f );
+            Vector3 top = position + offset + ( direction * length * 0.5f );
+            Vector3 bottomA = position + offset + ( ( -direction + perpendicularA ).normalized * length * 0.5f );
+            Vector3 bottomB = position + offset + ( ( -direction + perpendicularB ).normalized * length * 0.5f );
 
             lineRenderer.positionCount = 3;
             lineRenderer.material.color = color;
@@ -48,77 +48,46 @@ namespace BreakIO
             return true;
         }
 
-        public static bool Arrow( Vector3 position , Vector3 direction , float size )
-        {
-            Vector3 perpendicularA = new Vector3( -direction.y , direction.x );
-            Vector3 perpendicularB = -perpendicularA;
-
-            Vector3 top = position + ( direction * size * 0.5f );
-            Vector3 bottomA = position + ( ( -direction + perpendicularA ).normalized * size * 0.5f );
-            Vector3 bottomB = position + ( ( -direction + perpendicularB ).normalized * size * 0.5f );
-
-            Line( top , bottomA , Color.green );
-            Line( bottomB , top , Color.green );
-            Line( bottomA , bottomB , Color.green );
-            return true;
-        }
-
-        public static bool Circle( Vector3 position , float radius , Color color = default( Color ) , float duration = 0 , int resolution = 20 )
-        {
-            float increment = 360 / resolution;
-            Vector3[] points = new Vector3[ resolution ];
-
-            for ( int i = 0 ; resolution > i ; i++ )
-                points[ i ] = position + ( Quaternion.AngleAxis( increment * i , Vector3.forward ) * Vector3.up ) * radius;
-
-            for ( int i = 0 ; resolution - 1 > i ; i++ )
-                Line( points[ i ] , points[ i + 1 ] , color , duration );
-
-            Line( points[ resolution - 1 ] , points[ 0 ] , color , duration );
-            return true;
-        }
-
-        public static void Line( Vector3 from , Vector3 to , Color color = default( Color ) , float duration = 0 )
-        {
-            Debug.DrawLine( from , to , color , duration );
-        }
-
-        public static void Line( LineRenderer lineRenderer , Vector3 from , Vector3 to , Color color = default( Color ) )
+        public static void Line( LineRenderer lineRenderer , Vector3 from , Vector3 to , Vector3 offset , Color color = default( Color ) )
         {
             lineRenderer.positionCount = 2;
-            lineRenderer.SetPositions( new Vector3[] { from , to } );
+            lineRenderer.SetPositions( new Vector3[] { from + offset , to + offset } );
             lineRenderer.material.color = color;
         }
 
         public static void Line<T> ( T line , Color color = default( Color ) ) where T : ILine
         {
-            Line( _lineRenderers[ _registered.IndexOf( line ) ] , line.from , line.to , color );
+            Line( _lineRenderers[ _registered.IndexOf( line ) ] , line.from , line.to , line.offset , color );
         }
 
-        public static void Terminal( Terminal terminal )
+        public static void Terminals( Terminal terminal , Color color )
         {
             Vector3 position = terminal.node.position;
 
             switch ( terminal.mode )
             {
-                case global::BreakIO.Terminal.Mode.Multiply:
-                    Line( position + ( Vector3.left * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.right * 0.025f ) + ( Vector3.down * 0.025f ) , Color.green );
-                    Line( position + ( Vector3.right * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.left * 0.025f ) + ( Vector3.down * 0.025f ) , Color.green );
+                case Terminal.Modes.Multiply:
+                    terminal.Line( Terminal.Lines.A , position + ( Vector3.left * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.right * 0.025f ) + ( Vector3.down * 0.025f ) , Color.magenta );
+                    terminal.Line( Terminal.Lines.B , position + ( Vector3.right * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.left * 0.025f ) + ( Vector3.down * 0.025f ) , Color.magenta );
+                    terminal.EnableLine( Terminal.Lines.C , false );
                     break;
 
-                case global::BreakIO.Terminal.Mode.Minus:
-                    Line( position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.green );
+                case Terminal.Modes.Minus:
+                    terminal.Line( Terminal.Lines.A , position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.magenta );
+                    terminal.EnableLine( Terminal.Lines.B , false );
+                    terminal.EnableLine( Terminal.Lines.C , false );
                     break;
 
-                case global::BreakIO.Terminal.Mode.Home:
-                    Line( position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.green );
-                    Line( position + ( Vector3.left * 0.025f ) + ( Vector3.up * 0.04f ) , position + ( Vector3.left * 0.025f ) + ( Vector3.down * 0.04f ) , Color.green );
-                    Line( position + ( Vector3.right * 0.025f ) + ( Vector3.up * 0.04f ) , position + ( Vector3.right * 0.025f ) + ( Vector3.down * 0.04f ) , Color.green );
+                case Terminal.Modes.Home:
+                    terminal.Line( Terminal.Lines.A , position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.magenta );
+                    terminal.Line( Terminal.Lines.B , position + ( Vector3.left * 0.025f ) + ( Vector3.up * 0.04f ) , position + ( Vector3.left * 0.025f ) + ( Vector3.down * 0.04f ) , Color.magenta );
+                    terminal.Line( Terminal.Lines.C , position + ( Vector3.right * 0.025f ) + ( Vector3.up * 0.04f ) , position + ( Vector3.right * 0.025f ) + ( Vector3.down * 0.04f ) , Color.magenta );
                     break;
 
-                case global::BreakIO.Terminal.Mode.Plus:
-                    Line( position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.green );
-                    Line( position + ( Vector3.up * 0.025f ) , position + ( Vector3.down * 0.025f ) , Color.green );
+                case Terminal.Modes.Plus:
+                    terminal.Line( Terminal.Lines.A , position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.magenta );
+                    terminal.Line( Terminal.Lines.B , position + ( Vector3.up * 0.025f ) , position + ( Vector3.down * 0.025f ) , Color.magenta );
+                    terminal.EnableLine( Terminal.Lines.C , false );
                     break;
             }
         }
@@ -128,7 +97,7 @@ namespace BreakIO
             bool registered = _registered.Contains( circle );
 
             if ( registered )
-                Circle( _lineRenderers[ _registered.IndexOf( circle ) ] , circle.position , circle.radius , color , resolution );
+                Circle( _lineRenderers[ _registered.IndexOf( circle ) ] , circle.position , circle.offset , circle.radius , color , resolution );
 
             return registered;
         }
@@ -149,13 +118,13 @@ namespace BreakIO
             return true;
         }
 
-        public static bool Circle ( LineRenderer lineRenderer , Vector3 position , float radius , Color color = default( Color ) , int resolution = 20 )
+        public static bool Circle ( LineRenderer lineRenderer , Vector3 position , Vector3 offset , float radius , Color color = default( Color ) , int resolution = 20 )
         {
             float increment = 360 / resolution;
             Vector3[] points = new Vector3[ resolution ];
 
             for ( int i = 0 ; resolution > i ; i++ )
-                points[ i ] = position + ( Quaternion.AngleAxis( increment * i , Vector3.forward ) * Vector3.up ) * radius;
+                points[ i ] = position + offset + ( Quaternion.AngleAxis( increment * i , Vector3.forward ) * Vector3.up ) * radius;
 
             lineRenderer.positionCount = points.Length;
             lineRenderer.SetPositions( points );
@@ -236,7 +205,7 @@ namespace BreakIO
             if ( Time.time > signalTime + signalInterval )
             {
                 for ( int i = 0 ; terminals.Count > i ; i++ )
-                    if ( terminals[ i ].mode == Terminal.Mode.Home )
+                    if ( terminals[ i ].mode == Terminal.Modes.Home )
                         terminals[ i ].RouteSignal( new Signal( terminals[ i ] , 1 ) , client );
 
                 signalTime = Time.time;
@@ -330,12 +299,9 @@ namespace BreakIO
         {
             for ( int i = 0 ; grid.width * grid.height > i ; i++ )
             {
-
                 Draw.LineRendererColor( lineRenderers[ i ] , Overlap( currentWorldMousePosition , 0.01f , this[ i ] , 0.125f ) ? Color.magenta : Color.cyan );
                 lineRenderers[ i ].enabled = !Overlap( this[ i ] , 0.125f ) && NetworkAtIndex( i ) == null;
             }
-
-            Draw.Circle( currentValidMousePosition , 0.01f , Color.red );
 
             for ( int i = 0 ; networks.Count > i ; i++ )
                 Draw.Circle( networks[ i ] , hoverNetwork == networks[ i ] ? Color.magenta : Color.yellow );
@@ -348,17 +314,9 @@ namespace BreakIO
 
             for ( int i = 0 ; links.Count > i ; i++ )
                 Draw.Line( links[ i ] , Color.green );
-
-            /*
+            
             for ( int i = 0 ; terminals.Count > i ; i++ )
-                Draw.Terminal( terminals[ i ] );
-
-            for ( int i = 0 ; connections.Count > i ; i++ )
-                Draw.Line( connections[ i ].a.position , connections[ i ].b.position , Color.yellow );
-
-            for ( int i = 0 ; links.Count > i ; i++ )
-                Draw.Line( links[ i ].master.node.position , links[ i ].slave.node.position , Color.green );
-            */
+                Draw.Terminals( terminals[ i ] , Color.magenta );
         }
 
         private static Vector2 IntersectionPoint( Vector2 a1 , Vector2 a2 , Vector2 b1 , Vector2 b2 )
@@ -442,7 +400,7 @@ namespace BreakIO
         private void TrySwapTerminal()
         {
             if ( !addingConnection && Input.GetMouseButtonDown( 0 ) && hoverNode != null && hoverNode.terminal != null )
-                hoverNode.terminal.SetMode( hoverNode.terminal.mode + 1 > Terminal.Mode.Count - 1 ? Terminal.Mode.None : hoverNode.terminal.mode + 1 );
+                hoverNode.terminal.SetMode( hoverNode.terminal.mode + 1 > Terminal.Modes.Count - 1 ? Terminal.Modes.None : hoverNode.terminal.mode + 1 );
         }
 
         private void TryRemoveTerminal()
@@ -467,11 +425,12 @@ namespace BreakIO
         {
             Node to = null;
             addingConnection = true;
+            Vector3 offset = Vector3.zero;
             LineRenderer lineRenderer = Draw.GetLineRenderer( "AddConnection" , new LineRendererSettings( 1 , 1 , 0.01f , Color.white , false ) );
 
             while ( Input.GetMouseButton( 0 ) )
             {
-                Draw.Line( lineRenderer , from.position + ( ( currentWorldMousePosition - from.position ).normalized * from.radius ) , currentWorldMousePosition , Color.white );
+                Draw.Line( lineRenderer , from.position + ( ( currentWorldMousePosition - from.position ).normalized * from.radius ) , currentWorldMousePosition , offset , Color.white );
                 to = Overlap( currentWorldMousePosition , 0 , nearestNode.position , nearestNode.radius ) ? nearestNode : to;
                 yield return null;
             }
@@ -503,12 +462,13 @@ namespace BreakIO
         private IEnumerator RemoveConnectionHandler()
         {
             removingConnection = true;
+            Vector3 offset = Vector3.zero;
             Vector3 start = currentWorldMousePosition;
             LineRenderer lineRenderer = Draw.GetLineRenderer( "RemoveConnection" , new LineRendererSettings( 1 , 1 , 0.01f , Color.red , false ) );
 
             while ( Input.GetMouseButton( 1 ) )
             {
-                Draw.Line( lineRenderer , start , currentWorldMousePosition , Color.red );
+                Draw.Line( lineRenderer , start , currentWorldMousePosition , offset , Color.red );
                 yield return null;
             }
 
@@ -695,7 +655,7 @@ namespace BreakIO
                 lineRenderers.Add( Draw.GetLineRenderer( "Grid" + i , new LineRendererSettings( 1 , 1 , 0.01f , Color.white ) ) );
 
             for ( int i = 0 ; width * height > i ; i++ )
-                Draw.Circle( lineRenderers[ i ] , this[ i ] , 0.125f , Color.white );
+                Draw.Circle( lineRenderers[ i ] , this[ i ] , Vector3.forward , 0.125f , Color.white );
         }
     }
 
@@ -780,7 +740,7 @@ namespace BreakIO
                 float delay = 1f / signal.strength;
 
                 for ( int i = 0 ; signal.strength > i ; i++ )
-                    client.StartCoroutine( SignalHandler( signal , delay * i , client ) );
+                    client.StartCoroutine( SignalHandler( new Signal( signal ) , delay * i , client ) );
 
                 if ( signal.strength > 0 )
                 {
@@ -803,15 +763,22 @@ namespace BreakIO
                 yield return delay -= Time.deltaTime;
 
             float t = 0;
+            Vector3 to = slave.node.position;
+            float toRadius = slave.node.radius;
+            Vector3 from = master.node.position;
+            float fromRadius = master.node.radius;
+            Vector3 direction = ( slave.node.position - master.node.position ).normalized;
+            Draw.Register( signal , new LineRendererSettings( 0 , 0 , 0.01f , Color.magenta ) );
 
-            while ( 1 > t && connection != null && master != null && slave != null && master.node != null && slave.node != null )
-                yield return Draw.Arrow( signal , Vector3.Lerp( master.node.position , slave.node.position , t += Time.deltaTime ) , ( slave.node.position - master.node.position ).normalized , Color.magenta );
+            while ( 1 > t && signal != null && connection != null && master != null && slave != null && master.node != null && slave.node != null )
+                yield return Draw.Arrow( signal , Vector3.Lerp( from + ( direction * fromRadius ) , to - ( direction * toRadius ) , t += Time.deltaTime ) , direction , Color.magenta );
 
             Draw.Deregister( signal );
         }
 
         public Vector3 from { get { return master.node.position + ( ( slave.node.position - master.node.position ).normalized * master.node.radius ); } }
         public Vector3 to { get { return slave.node.position + ( ( master.node.position - slave.node.position ).normalized * slave.node.radius ); } }
+        public Vector3 offset { get { return Vector3.forward * 0.5f; } }
 
         public Terminal slave { get; private set; }
         public Terminal master { get; private set; }
@@ -851,6 +818,7 @@ namespace BreakIO
             return this;
         }
 
+        public Vector3 offset { get { return Vector3.zero; } }
         public float length { get { return 0.05f; } }
 
         public int strength { get; private set; }
@@ -867,7 +835,6 @@ namespace BreakIO
         {
             strength = signal.strength;
             route = new List<Terminal>( signal.route );
-            Draw.Register( this , new LineRendererSettings( 0 , 0 , 0.01f , Color.magenta ) );
         }
     }
 
@@ -904,10 +871,10 @@ namespace BreakIO
         {
             switch ( mode )
             {
-                case Mode.Plus:
+                case Modes.Plus:
                     return signal.Plus();
 
-                case Mode.Minus:
+                case Modes.Minus:
                     return signal.Minus();
 
                 default:
@@ -915,7 +882,7 @@ namespace BreakIO
             }
         }
 
-        public Terminal SetMode ( Mode mode )
+        public Terminal SetMode ( Modes mode )
         {
             this.mode = mode;
             return this;
@@ -953,26 +920,50 @@ namespace BreakIO
             while ( links.Count > 0 )
                 RemoveLink( links[ links.Count - 1 ] );
 
+            for ( int i = 0 ; lineRenderers.Length > i ; i++ )
+                Draw.RemoveLineRenderer( lineRenderers[ i ] );
+
             node.network.level.RemoveTerminal( this );
+            lineRenderers = null;
             links = null;
             node = null;
             return this;
         }
 
+        public void Line( Lines line , Vector3 from , Vector3 to , Color color )
+        {
+            EnableLine( line , true );
+            lineRenderers[ ( int ) line ].positionCount = 2;
+            lineRenderers[ ( int ) line ].material.color = color;
+            lineRenderers[ ( int ) line ].SetPositions( new Vector3[] { from , to } );
+        }
+
+        public void EnableLine ( Lines line , bool enabled )
+        {
+            lineRenderers[ ( int ) line ].enabled = enabled;
+        }
+
+        public LineRenderer[] lineRenderers { get; private set; }
         public List<Link> links { get; private set; }
         public Node node { get; private set; }
-        public Mode mode { get; private set; }
+        public Modes mode { get; private set; }
 
         private int _currentLink { get; set; }
-        private bool _broadcast { get { return mode == Mode.Multiply; } }
+        private bool _broadcast { get { return mode == Modes.Multiply; } }
 
         public Terminal( Node node )
         {
             this.node = node;
             links = new List<Link>( node.connections.Count );
+            lineRenderers = new LineRenderer[]
+            {
+                Draw.GetLineRenderer( Lines.A.ToString() , new LineRendererSettings( 0 , 0 , 0.01f , Color.magenta , false ) ) ,
+                Draw.GetLineRenderer( Lines.B.ToString() , new LineRendererSettings( 0 , 0 , 0.01f , Color.magenta , false ) ) ,
+                Draw.GetLineRenderer( Lines.C.ToString() , new LineRendererSettings( 0 , 0 , 0.01f , Color.magenta , false ) )
+            };
         }
 
-        public enum Mode
+        public enum Modes
         {
             None,
             Home,
@@ -980,6 +971,13 @@ namespace BreakIO
             Minus,
             Multiply,
             Count
+        }
+
+        public enum Lines
+        {
+            A,
+            B,
+            C
         }
     }
 
@@ -1039,6 +1037,7 @@ namespace BreakIO
         }
 
         public float radius { get { return 0.0625f; } }
+        public Vector3 offset { get { return Vector3.forward * ( terminal != null ? 0.25f : 0.5f ); } }
 
         public Network network { get; private set; }
         public Terminal terminal { get; private set; }
@@ -1143,6 +1142,7 @@ namespace BreakIO
             }
         }
 
+        public Vector3 offset { get { return Vector3.forward * 0.75f; } }
         public float radius { get { return Radius( nodes.Count ); } }
         public Vector3 position { get { return level[ index ]; } }
 
@@ -1191,6 +1191,7 @@ namespace BreakIO
 
         public Vector3 from { get { return a.position + ( ( b.position - a.position ).normalized * a.radius ); } }
         public Vector3 to { get { return b.position + ( ( a.position - b.position ).normalized * a.radius ); } }
+        public Vector3 offset { get { return Vector3.forward * 0.25f; } }
 
         public Node a { get; private set; }
         public Node b { get; private set; }
@@ -1223,7 +1224,10 @@ namespace BreakIO
         Vector3 position { get; }
     }
 
-    public interface IBase { }
+    public interface IBase
+    {
+        Vector3 offset { get; }
+    }
 
     public struct LineRendererSettings
     {
