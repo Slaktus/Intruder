@@ -27,6 +27,27 @@ namespace BreakIO
             _material = material;
         }
 
+        public static bool Arrow<T>( T arrow , Vector3 position , Vector3 direction , Color color = default( Color ) ) where T : IArrow
+        {
+            Arrow( _lineRenderers[ _registered.IndexOf( arrow ) ] , position , direction , arrow.length , color );
+            return true;
+        }
+
+        public static bool Arrow( LineRenderer lineRenderer , Vector3 position , Vector3 direction , float length , Color color = default( Color ) )
+        {
+            Vector3 perpendicularA = new Vector3( -direction.y , direction.x );
+            Vector3 perpendicularB = -perpendicularA;
+
+            Vector3 top = position + ( direction * length * 0.5f );
+            Vector3 bottomA = position + ( ( -direction + perpendicularA ).normalized * length * 0.5f );
+            Vector3 bottomB = position + ( ( -direction + perpendicularB ).normalized * length * 0.5f );
+
+            lineRenderer.positionCount = 3;
+            lineRenderer.material.color = color;
+            lineRenderer.SetPositions( new Vector3[] { top , bottomA , bottomB } );
+            return true;
+        }
+
         public static bool Arrow( Vector3 position , Vector3 direction , float size )
         {
             Vector3 perpendicularA = new Vector3( -direction.y , direction.x );
@@ -759,7 +780,7 @@ namespace BreakIO
                 float delay = 1f / signal.strength;
 
                 for ( int i = 0 ; signal.strength > i ; i++ )
-                    client.StartCoroutine( SignalHandler( delay * i , client ) );
+                    client.StartCoroutine( SignalHandler( signal , delay * i , client ) );
 
                 if ( signal.strength > 0 )
                 {
@@ -776,7 +797,7 @@ namespace BreakIO
             }
         }
 
-        IEnumerator SignalHandler( float delay , MonoBehaviour client )
+        IEnumerator SignalHandler( Signal signal , float delay , MonoBehaviour client )
         {
             while ( delay > 0 && connection != null && master != null && slave != null && master.node != null && slave.node != null )
                 yield return delay -= Time.deltaTime;
@@ -784,7 +805,9 @@ namespace BreakIO
             float t = 0;
 
             while ( 1 > t && connection != null && master != null && slave != null && master.node != null && slave.node != null )
-                yield return Draw.Arrow( Vector3.Lerp( master.node.position , slave.node.position , t += Time.deltaTime ) , ( slave.node.position - master.node.position ).normalized , 0.05f );
+                yield return Draw.Arrow( signal , Vector3.Lerp( master.node.position , slave.node.position , t += Time.deltaTime ) , ( slave.node.position - master.node.position ).normalized , Color.magenta );
+
+            Draw.Deregister( signal );
         }
 
         public Vector3 from { get { return master.node.position + ( ( slave.node.position - master.node.position ).normalized * master.node.radius ); } }
@@ -807,12 +830,11 @@ namespace BreakIO
         }
     }
 
-    public class Signal
+    public class Signal : IArrow
     {
         public Signal Route( Terminal from , Terminal to , MonoBehaviour client )
         {
-            this.from = from;
-            route.Add( from );
+            route.Add( to );
             to.RouteSignal( this , client );
             return this;
         }
@@ -829,23 +851,23 @@ namespace BreakIO
             return this;
         }
 
-        public Terminal from { get; private set; }
+        public float length { get { return 0.05f; } }
+
         public int strength { get; private set; }
 
         private List<Terminal> route { get; set; }
 
         public Signal( Terminal from , int strength )
         {
-            this.from = from;
             this.strength = strength;
-            route = new List<Terminal>();
+            route = new List<Terminal>() { from };
         }
 
         public Signal( Signal signal )
         {
-            from = signal.from;
             strength = signal.strength;
             route = new List<Terminal>( signal.route );
+            Draw.Register( this , new LineRendererSettings( 0 , 0 , 0.01f , Color.magenta ) );
         }
     }
 
@@ -1182,6 +1204,11 @@ namespace BreakIO
             Draw.Register( this , new LineRendererSettings( 1 , 1 , 0.01f , Color.white , false ) );
             Draw.Line( this , Color.white );
         }
+    }
+
+    public interface IArrow : IBase
+    {
+        float length { get; }
     }
 
     public interface ILine : IBase
