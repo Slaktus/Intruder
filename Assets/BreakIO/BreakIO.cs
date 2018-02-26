@@ -311,7 +311,7 @@ namespace BreakIO
         {
             for ( int i = 0 ; grid.width * grid.height > i ; i++ )
             {
-                Draw.Color( lineRenderers[ i ] , Overlap( currentWorldMousePosition , 0.01f , this[ i ] , 0.125f ) ? Color.magenta : Color.cyan );
+                Draw.Color( lineRenderers[ i ] , Overlap( worldMousePosition , 0.01f , this[ i ] , 0.125f ) ? Color.magenta : Color.cyan );
                 lineRenderers[ i ].enabled = !Overlap( this[ i ] , 0.125f ) && NetworkAtIndex( i ) == null;
             }
 
@@ -371,12 +371,7 @@ namespace BreakIO
         {
             Vector2 mousePosition = Input.mousePosition;
             Vector3 projectedMouse = new Vector3( mousePosition.x , mousePosition.y , Camera.main.transform.position.z );
-            currentWorldMousePosition = Camera.main.ScreenToWorldPoint( new Vector3( projectedMouse.x , projectedMouse.y , -projectedMouse.z ) );
-            RaycastHit[] hits = Physics.RaycastAll( Camera.main.ScreenPointToRay( projectedMouse ) );
-            currentGridMousePosition = Vector3.zero;
-
-            for ( int i = 0 ; hits.Length > i ; i++ )
-                lastValidGridMousePosition = currentGridMousePosition = hits[ i ].point;
+            worldMousePosition = Camera.main.ScreenToWorldPoint( new Vector3( projectedMouse.x , projectedMouse.y , -projectedMouse.z ) );
         }
 
         private void TryAddNode()
@@ -442,8 +437,8 @@ namespace BreakIO
 
             while ( Input.GetMouseButton( 0 ) )
             {
-                Draw.Line( lineRenderer , from.position + ( ( currentWorldMousePosition - from.position ).normalized * from.radius ) , currentWorldMousePosition , offset , Color.white );
-                to = Overlap( currentWorldMousePosition , 0 , nearestNode.position , nearestNode.radius ) ? nearestNode : to;
+                Draw.Line( lineRenderer , from.position + ( ( worldMousePosition - from.position ).normalized * from.radius ) , worldMousePosition , offset , Color.white );
+                to = Overlap( worldMousePosition , 0 , nearestNode.position , nearestNode.radius ) ? nearestNode : to;
                 yield return null;
             }
 
@@ -475,16 +470,16 @@ namespace BreakIO
         {
             removingConnection = true;
             Vector3 offset = Vector3.zero;
-            Vector3 start = currentWorldMousePosition;
+            Vector3 start = worldMousePosition;
             LineRenderer lineRenderer = Draw.GetLineRenderer( "RemoveConnection" , new LineRendererSettings( 1 , 1 , 0.01f , Color.red , false ) );
 
             while ( Input.GetMouseButton( 1 ) )
             {
-                Draw.Line( lineRenderer , start , currentWorldMousePosition , offset , Color.red );
+                Draw.Line( lineRenderer , start , worldMousePosition , offset , Color.red );
                 yield return null;
             }
 
-            Vector3 end = currentWorldMousePosition;
+            Vector3 end = worldMousePosition;
             int index = -1;
 
             for ( int i = 0 ; connections.Count > i && 0 > index ; i++ )
@@ -586,27 +581,24 @@ namespace BreakIO
 
                 for ( int i = 0 ; networks.Count > i ; i++ )
                 {
-                    Node nearest = Nearest( currentWorldMousePosition , networks[ i ].nodes );
+                    Node nearest = Nearest( worldMousePosition , networks[ i ].nodes );
 
                     if ( nearest != null )
                         nodes.Add( nearest );
                 }
 
-                return Nearest( currentWorldMousePosition , nodes );
+                return Nearest( worldMousePosition , nodes );
             }
         }
 
-        public Network nearestNetwork { get { return Nearest( currentWorldMousePosition , networks ); } }
+        public Network nearestNetwork { get { return Nearest( worldMousePosition , networks ); } }
 
-        public Vector3 currentGridMousePosition { get; private set; }
-        public Vector3 currentWorldMousePosition { get; private set; }
-        public Vector3 lastValidGridMousePosition { get; private set; }
+        public Vector3 worldMousePosition { get; private set; }
         public Vector3 this[ int index ] { get { return grid.GetPosition( index ); } }
         public Vector3 this[ int x , int y ] { get { return grid.GetPosition( x , y ); } }
-        public Vector3 currentValidMousePosition { get { return currentGridMousePosition != Vector3.zero ? currentGridMousePosition : currentWorldMousePosition; } }
-        public Network hoverNetwork { get { return nearestNetwork != null && Overlap( currentValidMousePosition , 0 , nearestNetwork.position , nearestNetwork.radius ) ? nearestNetwork : null; } }
-        public Node hoverNode { get { return nearestNode != null && Overlap( currentValidMousePosition , 0 , nearestNode.position , nearestNode.radius ) ? nearestNode : null; } }
-        public int nearestIndex { get { return NearestIndex( lastValidGridMousePosition ); } }
+        public Network hoverNetwork { get { return nearestNetwork != null && Overlap( worldMousePosition , 0 , nearestNetwork.position , nearestNetwork.radius ) ? nearestNetwork : null; } }
+        public Node hoverNode { get { return nearestNode != null && Overlap( worldMousePosition , 0 , nearestNode.position , nearestNode.radius ) ? nearestNode : null; } }
+        public int nearestIndex { get { return NearestIndex( worldMousePosition ); } }
 
         public Grid grid { get; private set; }
         public List<Node> nodes { get; private set; }
@@ -623,7 +615,6 @@ namespace BreakIO
         private bool removingConnection { get; set; }
         private MeshCollider meshCollider { get; set; }
         private List<LineRenderer> lineRenderers { get; set; }
-
 
         public Level ( int width , int height , float spacing , MonoBehaviour client = null , float padding = -1 )
         {
@@ -805,6 +796,7 @@ namespace BreakIO
             this.connection = connection;
             this.master = master.terminal;
             this.slave = slave.terminal;
+
             _signalQueue = new Queue<Signal>( 10 );
             Draw.Register( this , new LineRendererSettings( 1 , 1 , 0.02f , Color.white , false ) );
             Draw.Line( this , Color.green );
@@ -959,8 +951,8 @@ namespace BreakIO
 
         public LineRenderer[] lineRenderers { get; private set; }
         public List<Link> links { get; private set; }
-        public Node node { get; private set; }
         public Modes mode { get; private set; }
+        public Node node { get; private set; }
 
         private int _currentLink { get; set; }
         private bool _broadcast { get { return mode == Modes.Multiply; } }
