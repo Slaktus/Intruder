@@ -49,6 +49,11 @@ namespace BreakIO
             return true;
         }
 
+        public static void Line<T>( T line , Color color = default( Color ) ) where T : ILine
+        {
+            Line( _lineRenderers[ _registered.IndexOf( line ) ] , line.from , line.to , line.offset , color );
+        }
+
         public static void Line( LineRenderer lineRenderer , Vector3 from , Vector3 to , Vector3 offset , Color color = default( Color ) )
         {
             lineRenderer.positionCount = 2;
@@ -56,44 +61,7 @@ namespace BreakIO
             lineRenderer.material.color = color;
         }
 
-        public static void Line<T> ( T line , Color color = default( Color ) ) where T : ILine
-        {
-            Line( _lineRenderers[ _registered.IndexOf( line ) ] , line.from , line.to , line.offset , color );
-        }
-
-        public static void Terminals( Terminal terminal , Color color )
-        {
-            Vector3 position = terminal.node.position;
-
-            switch ( terminal.mode )
-            {
-                case Terminal.Modes.Multiply:
-                    terminal.Line( Terminal.Lines.A , position + ( Vector3.left * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.right * 0.025f ) + ( Vector3.down * 0.025f ) , Color.magenta );
-                    terminal.Line( Terminal.Lines.B , position + ( Vector3.right * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.left * 0.025f ) + ( Vector3.down * 0.025f ) , Color.magenta );
-                    terminal.EnableLine( Terminal.Lines.C , false );
-                    break;
-
-                case Terminal.Modes.Minus:
-                    terminal.Line( Terminal.Lines.A , position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.magenta );
-                    terminal.EnableLine( Terminal.Lines.B , false );
-                    terminal.EnableLine( Terminal.Lines.C , false );
-                    break;
-
-                case Terminal.Modes.Home:
-                    terminal.Line( Terminal.Lines.A , position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.magenta );
-                    terminal.Line( Terminal.Lines.B , position + ( Vector3.left * 0.025f ) + ( Vector3.up * 0.04f ) , position + ( Vector3.left * 0.025f ) + ( Vector3.down * 0.04f ) , Color.magenta );
-                    terminal.Line( Terminal.Lines.C , position + ( Vector3.right * 0.025f ) + ( Vector3.up * 0.04f ) , position + ( Vector3.right * 0.025f ) + ( Vector3.down * 0.04f ) , Color.magenta );
-                    break;
-
-                case Terminal.Modes.Plus:
-                    terminal.Line( Terminal.Lines.A , position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , Color.magenta );
-                    terminal.Line( Terminal.Lines.B , position + ( Vector3.up * 0.025f ) , position + ( Vector3.down * 0.025f ) , Color.magenta );
-                    terminal.EnableLine( Terminal.Lines.C , false );
-                    break;
-            }
-        }
-
-        public static bool Circle<T> ( T circle , Color color = default( Color ) , int resolution = 20 ) where T : ICircle
+        public static bool Circle<T>( T circle , Color color = default( Color ) , int resolution = 20 ) where T : ICircle
         {
             bool registered = _registered.Contains( circle );
 
@@ -103,23 +71,7 @@ namespace BreakIO
             return registered;
         }
 
-        public static bool LineRendererColor<T>( T circle , Color color ) where T : ICircle
-        {
-            bool registered = _registered.Contains( circle );
-
-            if ( registered )
-                LineRendererColor( _lineRenderers[ _registered.IndexOf( circle ) ] , color );
-
-            return registered;
-        }
-
-        public static bool LineRendererColor( LineRenderer lineRenderer , Color color )
-        {
-            lineRenderer.material.color = color;
-            return true;
-        }
-
-        public static bool Circle ( LineRenderer lineRenderer , Vector3 position , Vector3 offset , float radius , Color color = default( Color ) , int resolution = 20 )
+        public static bool Circle( LineRenderer lineRenderer , Vector3 position , Vector3 offset , float radius , Color color = default( Color ) , int resolution = 20 )
         {
             float increment = 360 / resolution;
             Vector3[] points = new Vector3[ resolution ];
@@ -129,6 +81,54 @@ namespace BreakIO
 
             lineRenderer.positionCount = points.Length;
             lineRenderer.SetPositions( points );
+            lineRenderer.material.color = color;
+            return true;
+        }
+
+        public static void Terminals( Terminal terminal , Color color )
+        {
+            Vector3 position = terminal.node.position;
+
+            switch ( terminal.mode )
+            {
+                case Terminal.Modes.Multiply:
+                    terminal.Line( Terminal.Lines.A , position + ( Vector3.left * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.right * 0.025f ) + ( Vector3.down * 0.025f ) , UnityEngine.Color.magenta );
+                    terminal.Line( Terminal.Lines.B , position + ( Vector3.right * 0.025f ) + ( Vector3.up * 0.025f ) , position + ( Vector3.left * 0.025f ) + ( Vector3.down * 0.025f ) , UnityEngine.Color.magenta );
+                    terminal.EnableLine( Terminal.Lines.C , false );
+                    break;
+
+                case Terminal.Modes.Minus:
+                    terminal.Line( Terminal.Lines.A , position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , UnityEngine.Color.magenta );
+                    terminal.EnableLine( Terminal.Lines.B , false );
+                    terminal.EnableLine( Terminal.Lines.C , false );
+                    break;
+
+                case Terminal.Modes.Home:
+                    terminal.Line( Terminal.Lines.A , position + ( Vector3.left * 0.015f ) , position + ( Vector3.right * 0.015f ) , UnityEngine.Color.magenta );
+                    terminal.Line( Terminal.Lines.B , position + ( Vector3.left * 0.015f ) + ( Vector3.up * 0.03f ) , position + ( Vector3.left * 0.015f ) + ( Vector3.down * 0.03f ) , UnityEngine.Color.magenta );
+                    terminal.Line( Terminal.Lines.C , position + ( Vector3.right * 0.015f ) + ( Vector3.up * 0.03f ) , position + ( Vector3.right * 0.015f ) + ( Vector3.down * 0.03f ) , UnityEngine.Color.magenta );
+                    break;
+
+                case Terminal.Modes.Plus:
+                    terminal.Line( Terminal.Lines.A , position + ( Vector3.left * 0.025f ) , position + ( Vector3.right * 0.025f ) , UnityEngine.Color.magenta );
+                    terminal.Line( Terminal.Lines.B , position + ( Vector3.up * 0.025f ) , position + ( Vector3.down * 0.025f ) , UnityEngine.Color.magenta );
+                    terminal.EnableLine( Terminal.Lines.C , false );
+                    break;
+            }
+        }
+
+        public static bool Color<T>( T circle , Color color ) where T : ICircle
+        {
+            bool registered = _registered.Contains( circle );
+
+            if ( registered )
+                Color( _lineRenderers[ _registered.IndexOf( circle ) ] , color );
+
+            return registered;
+        }
+
+        public static bool Color( LineRenderer lineRenderer , Color color )
+        {
             lineRenderer.material.color = color;
             return true;
         }
@@ -212,11 +212,6 @@ namespace BreakIO
 
     public class Level
     {
-        public void GameUpdate() { }
-
-        private float signalTime = 0;
-        private float signalInterval = 1;
-
         public bool EditorUpdate( MonoBehaviour client )
         {
             if ( Time.time > signalTime + signalInterval )
@@ -316,7 +311,7 @@ namespace BreakIO
         {
             for ( int i = 0 ; grid.width * grid.height > i ; i++ )
             {
-                Draw.LineRendererColor( lineRenderers[ i ] , Overlap( currentWorldMousePosition , 0.01f , this[ i ] , 0.125f ) ? Color.magenta : Color.cyan );
+                Draw.Color( lineRenderers[ i ] , Overlap( currentWorldMousePosition , 0.01f , this[ i ] , 0.125f ) ? Color.magenta : Color.cyan );
                 lineRenderers[ i ].enabled = !Overlap( this[ i ] , 0.125f ) && NetworkAtIndex( i ) == null;
             }
 
@@ -606,7 +601,6 @@ namespace BreakIO
         public Vector3 currentGridMousePosition { get; private set; }
         public Vector3 currentWorldMousePosition { get; private set; }
         public Vector3 lastValidGridMousePosition { get; private set; }
-        public Vector3 nearestGridPosition { get { return this[ nearestIndex ]; } }
         public Vector3 this[ int index ] { get { return grid.GetPosition( index ); } }
         public Vector3 this[ int x , int y ] { get { return grid.GetPosition( x , y ); } }
         public Vector3 currentValidMousePosition { get { return currentGridMousePosition != Vector3.zero ? currentGridMousePosition : currentWorldMousePosition; } }
@@ -620,8 +614,10 @@ namespace BreakIO
         public List<Network> networks { get; private set; }
         public List<Terminal> terminals { get; private set; }
         public List<Connection> connections { get; private set; }
-        
+
         private Mesh mesh { get; set; }
+        private float signalTime { get; set; }
+        private float signalInterval { get; set; }
         private MonoBehaviour client { get; set; }
         private bool addingConnection { get; set; }
         private bool removingConnection { get; set; }
@@ -637,6 +633,7 @@ namespace BreakIO
             networks = new List<Network>();
             links = new List<Link>();
             nodes = new List<Node>();
+            signalInterval = 1;
 
             if ( 0 > padding )
                 padding = spacing;
